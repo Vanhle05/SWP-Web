@@ -123,7 +123,7 @@ export const notifications = [
 
 export const reports = [];
 
-// --- API Integration ---
+// --- API ---
 export const fetchOrders = async () => {
   try {
     const response = await fetch('https://kitchencontrolbe.onrender.com/orders');
@@ -138,6 +138,27 @@ export const fetchOrders = async () => {
     }
   } catch (error) {
     console.error('Error fetching orders from API:', error);
+  }
+};
+
+export const loginUser = async (username, password) => {
+  try {
+    const response = await fetch('https://kitchencontrolbe.onrender.com/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Đăng nhập thất bại');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error logging in:', error);
+    throw error;
   }
 };
 

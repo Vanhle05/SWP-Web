@@ -24,29 +24,24 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(false);
   }, []);
 
-  const login = (username, password) => {
-    const foundUser = users.find(
-      u => u.username === username && u.password === password
-    );
-
-    if (foundUser) {
-      const role = roles.find(r => r.role_id === foundUser.role_id);
-      const store = foundUser.store_id 
-        ? stores.find(s => s.store_id === foundUser.store_id) 
+  const login = (userData) => {
+    if (userData && userData.user) {
+      const apiUser = userData.user;
+      const role = roles.find(r => r.role_id === apiUser.role_id);
+      const store = apiUser.store_id
+        ? stores.find(s => s.store_id === apiUser.store_id)
         : null;
 
-      const userData = {
-        ...foundUser,
+      const fullUserData = {
+        ...apiUser,
         role: role,
         store: store,
+        token: userData.token,
       };
 
-      setUser(userData);
-      localStorage.setItem('kitchen_user', JSON.stringify(userData));
-      return { success: true, user: userData };
+      setUser(fullUserData);
+      localStorage.setItem('kitchen_user', JSON.stringify(fullUserData));
     }
-
-    return { success: false, error: 'Tên đăng nhập hoặc mật khẩu không đúng' };
   };
 
   const logout = () => {

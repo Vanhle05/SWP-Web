@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
+import { loginUser } from '../data/mockData';
+import localUsers from '../data/users.json';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { ChefHat, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -15,36 +18,69 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login, getRolePath } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const result = login(username, password);
     
-    if (result.success) {
-      const path = getRolePath();
-      navigate(path, { replace: true });
-    } else {
-      setError(result.error);
+    try {
+      let userData;
+      
+      // 1. Thử gọi API trước
+      try {
+        userData = await loginUser(username, password);
+      } catch (apiErr) {
+        console.warn("API Login failed, trying local data...", apiErr);
+      }
+      // Tạm thời vô hiệu hóa gọi API để chạy hoàn toàn Offline
+      // try {
+      //   userData = await loginUser(username, password);
+      // } catch (apiErr) {
+      //   console.warn("API Login failed, trying local data...", apiErr);
+      // }
+
+      // 2. Nếu API lỗi hoặc không trả về dữ liệu, kiểm tra file users.json cục bộ
+      if (!userData || !userData.user) {
+        const localUser = localUsers.find(
+          u => u.username === username && u.password === password
+        );
+        
+        if (localUser) {
+          userData = {
+            user: localUser,
+            token: 'mock-local-token'
+          };
+          toast.info('Đang sử dụng dữ liệu đăng nhập cục bộ');
+        }
+      }
+
+      if (userData && userData.user) {
+        login(userData);
+        toast.success('Đăng nhập thành công!');
+
+        const roleHome = {
+          1: '/admin',
+          2: '/coordinator',
+          3: '/kitchen',
+          4: '/store',
+          5: '/shipper',
+        };
+        // Lưu ý: role_id trong users.json của bạn cần khớp với roleHome ở đây
+        const path = roleHome[userData.user.role_id] || '/';
+        navigate(path, { replace: true });
+      } else {
+        toast.error('Tên đăng nhập hoặc mật khẩu không đúng.');
+      }
+    } catch (error) {
+      toast.error('Đã có lỗi xảy ra khi đăng nhập.');
+      console.error("Login error:", error);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
-
-  const demoAccounts = [
-    { username: 'admin', role: 'Quản trị viên' },
-    { username: 'supply_coor', role: 'Điều phối viên' },
-    { username: 'kitchen_mgr', role: 'Quản lý bếp' },
-    { username: 'mgr_east', role: 'Nhân viên cửa hàng' },
-    { username: 'shipper1', role: 'Shipper' },
-  ];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-secondary/20 to-background p-4">
@@ -127,36 +163,6 @@ export default function Login() {
                 )}
               </Button>
             </form>
-          </CardContent>
-        </Card>
-
-        {/* Demo accounts */}
-        <Card className="bg-muted/50">
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm font-medium">Tài khoản demo</CardTitle>
-          </CardHeader>
-          <CardContent className="py-0 pb-4">
-            <div className="space-y-2">
-              {demoAccounts.map((account) => (
-                <button
-                  key={account.username}
-                  type="button"
-                  className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-background transition-colors text-sm"
-                  onClick={() => {
-                    setUsername(account.username);
-                    setPassword('pass123');
-                  }}
-                >
-                  <span className="font-mono text-xs bg-background px-2 py-1 rounded">
-                    {account.username}
-                  </span>
-                  <span className="text-muted-foreground">{account.role}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3 text-center">
-              Mật khẩu mặc định: <code className="bg-background px-1 rounded">pass123</code>
-            </p>
           </CardContent>
         </Card>
       </div>
