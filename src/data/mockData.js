@@ -142,31 +142,35 @@ export const fetchOrders = async () => {
 };
 
 export const loginUser = async (username, password) => {
-  const response = await fetch('https://kitchencontrolbe.onrender.com/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username, password }),
-  });
+  try {
+    const response = await fetch('https://kitchencontrolbe.onrender.com/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
+    });
 
-  if (!response.ok) {
-    let errorMessage = 'Đăng nhập thất bại do lỗi không xác định.';
-    try {
-      // Cố gắng lấy thông báo lỗi chi tiết từ body của response
-      const errorData = await response.json();
-      if (errorData && errorData.message) {
-        errorMessage = errorData.message;
-      } else {
+    if (!response.ok) {
+      let errorMessage = 'Đăng nhập thất bại do lỗi không xác định.';
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.message) {
+          errorMessage = errorData.message;
+        } else {
+          errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+        }
+      } catch (e) {
         errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
       }
-    } catch (e) {
-      // Body không phải JSON hoặc rỗng
-      errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
+      throw new Error(errorMessage);
     }
-    throw new Error(errorMessage);
+    return await response.json();
+  } catch (error) {
+    // Bắt lỗi mạng (như CORS, mất mạng) để không bị crash ứng dụng
+    console.error("Lỗi kết nối khi đăng nhập:", error);
+    throw error; // Ném lỗi tiếp để UI xử lý fallback
   }
-  return await response.json();
 };
 
 // --- Reactivity System for Mock Data ---
