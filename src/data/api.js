@@ -2,9 +2,8 @@
 
 // Sử dụng Proxy '/api' khi chạy local (DEV) để tránh lỗi CORS.
 // Khi build production, sử dụng URL thật.
-const API_BASE_URL = import.meta.env.DEV 
-  ? '/api' 
-  : (import.meta.env.VITE_API_URL || 'https://kitchencontrolbe.onrender.com');
+// Cập nhật: Sử dụng '/api' cho cả Production (thông qua Vercel Rewrites) để tránh lỗi CORS.
+const API_BASE_URL = '/api';
 
 async function handleResponse(response) {
   if (!response.ok) {
