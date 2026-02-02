@@ -1,6 +1,7 @@
 // Mock Data for Franchise Central Kitchen Management System
 import React from 'react';
 import * as api from './api';
+import localUsers from './users.json';
 
 export const roles = [
   { role_id: 1, role_name: 'Admin' },
@@ -19,16 +20,11 @@ export const stores = [
   { store_id: 5, store_name: 'Bakery 1', address: 'Store 1 Name, Thu Duc City', phone: '080811111111' },
 ];
 
-export const users = [
-  { user_id: 1, username: 'admin', password: 'pass123', full_name: 'System Administrator', role_id: 1, store_id: null, is_active: true },
-  { user_id: 2, username: 'manager', password: 'pass123', full_name: 'Tran Giam Doc', role_id: 2, store_id: null, is_active: true },
-  { user_id: 3, username: 'staff_q1', password: 'pass123', full_name: 'Le Nhan Vien Q1', role_id: 3, store_id: 1, is_active: true },
-  { user_id: 4, username: 'staff_q7', password: 'pass123', full_name: 'Pham Nhan Vien Q7', role_id: 3, store_id: 1, is_active: true },
-  { user_id: 5, username: 'kitchen_mgr', password: 'pass123', full_name: 'Vo Bep Truong', role_id: 4, store_id: null, is_active: true },
-  { user_id: 6, username: 'coordinator', password: 'pass123', full_name: 'Dang Dieu Phoi', role_id: 5, store_id: null, is_active: true },
-  { user_id: 7, username: 'shipper_01', password: 'pass123', full_name: 'Hoang Shipper 1', role_id: 6, store_id: null, is_active: true },
-  { user_id: 8, username: 'shipper_02', password: 'pass123', full_name: 'Bui Shipper 2', role_id: 6, store_id: null, is_active: true },
-];
+// Sử dụng dữ liệu từ users.json nhưng LOẠI BỎ password để an toàn khi sử dụng ở các component khác
+export const users = localUsers.map(({ password, ...user }) => ({
+  ...user,
+  is_active: true // Mặc định active vì json chưa có trường này
+}));
 
 export const products = [
   { product_id: 1, product_name: 'Bột mì (Flour)', product_type: 'RAW_MATERIAL', unit: 'kg', shelf_life_days: 180, image: '🌾' },

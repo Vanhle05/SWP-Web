@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { users, stores, roles } from '../data/mockData';
+import { Loader2 } from 'lucide-react';
 
 const AuthContext = createContext(null);
 
@@ -72,6 +73,49 @@ export const AuthProvider = ({ children }) => {
     window.location.href = '/login'; 
   };
 
+  // --- Tự động Logout sau 5 phút không tương tác ---
+  useEffect(() => {
+    // Nếu chưa đăng nhập thì không cần chạy logic này
+    if (!user) return;
+
+    const INACTIVITY_LIMIT = 5 * 60 * 1000; // 5 phút (tính bằng mili giây)
+    let timeoutId;
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.log("Hết phiên làm việc do không tương tác. Đang đăng xuất...");
+        logout();
+      }, INACTIVITY_LIMIT);
+    };
+
+    // Các sự kiện được coi là "có tương tác"
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    
+    // Lắng nghe sự kiện để reset timer
+    events.forEach(event => document.addEventListener(event, resetTimer));
+
+    // Khởi động timer lần đầu
+    resetTimer();
+
+    // Dọn dẹp khi component unmount hoặc user logout
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      events.forEach(event => document.removeEventListener(event, resetTimer));
+    };
+  }, [user]); // Chạy lại khi trạng thái user thay đổi (đăng nhập/đăng xuất)
+
+  // Xác định xem trang hiện tại có phải là trang công khai (Login) không
+  const isPublicPage = window.location.pathname === '/login';
+
+  // --- Bảo vệ Route ngay tại Context (Chặn truy cập trực tiếp qua URL) ---
+  useEffect(() => {
+    // Nếu đã tải xong mà không có user, và đang không ở trang login
+    if (!isLoading && !user && !isPublicPage) {
+      window.location.href = '/login';
+    }
+  }, [isLoading, user, isPublicPage]);
+
   const getRolePath = () => {
     if (!user) return '/login';
     
@@ -94,6 +138,23 @@ export const AuthProvider = ({ children }) => {
     getRolePath,
     isAuthenticated: !!user,
   };
+
+  // Hiển thị màn hình chờ trong khi đang kiểm tra đăng nhập
+  // Điều này ngăn chặn việc lộ nội dung trang Admin trước khi bị đá về Login
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // --- CHỐT CHẶN CUỐI CÙNG (Render Guard) ---
+  // Nếu chưa đăng nhập và đang cố vào trang nội bộ -> Trả về null ngay lập tức.
+  // Điều này đảm bảo {children} (trang Admin) KHÔNG BAO GIỜ được render dù chỉ 1 mili-giây.
+  if (!user && !isPublicPage) {
+    return null; // Hoặc return <Loader2 ... /> nếu muốn giữ màn hình chờ
+  }
 
   return (
     <AuthContext.Provider value={value}>
