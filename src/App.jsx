@@ -2,8 +2,8 @@ import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import { MainLayout } from "./components/layout/MainLayout";
 
@@ -51,18 +51,6 @@ const ComingSoon = ({ title }) => (
   </div>
 );
 
-// Component bảo vệ route: Yêu cầu đăng nhập mới được truy cập
-const ProtectedRoute = ({ children }) => {
-  const { user } = useAuth();
-  const location = useLocation();
-
-  if (!user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-
-  return children;
-};
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -76,11 +64,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               
               {/* Protected routes */}
-              <Route element={
-                <ProtectedRoute>
-                  <MainLayout />
-                </ProtectedRoute>
-              }>
+              <Route element={<MainLayout />}>
                 {/* Store routes */}
                 <Route path="/store" element={<Marketplace />} />
                 <Route path="/store/cart" element={<Cart />} />
