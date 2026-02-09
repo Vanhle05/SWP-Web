@@ -10,7 +10,8 @@ async function handleResponse(response) {
     let errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
     const status = response.status;
     try {
-      const errorData = await response.json();
+      const text = await response.text();
+      const errorData = text ? JSON.parse(text) : {};
       const msg =
         (errorData && (errorData.message ?? errorData.error ?? errorData.errorDescription ?? errorData.msg)) ||
         '';
@@ -34,7 +35,9 @@ async function handleResponse(response) {
     }
     throw new Error(errorMessage);
   }
-  return response.json();
+  // Fix lỗi "Unexpected end of JSON input" khi body rỗng
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 // --- Mappers: API camelCase -> app snake_case (để component dùng thống nhất) ---
