@@ -1,128 +1,79 @@
-import React from 'react';
-import { 
-  productionPlans, 
-  orders, 
-  inventories, 
-  logBatches,
-  getFinishedProducts,
-  inventoryTransactions,
-  notifyListeners,
-  useMockDataWatcher 
-} from '../../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { fetchOrders, getInventories, getProducts } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { 
-  ClipboardList, 
-  AlertTriangle, 
-  ShoppingCart, 
+import {
+  ClipboardList,
+  AlertTriangle,
+  ShoppingCart,
   PackageCheck,
   ArrowDownToLine,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 
 export default function ManagerDashboard() {
-  useMockDataWatcher();
+  const [orders, setOrders] = useState([]);
+  const [inventories, setInventories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Thống kê cơ bản
-  const activePlans = productionPlans.filter(p => p.status === 'PROCESSING').length;
-  const pendingOrders = orders.filter(o => o.status === 'WAITTING').length;
-  
-  // Flow 4 - B1: Cảnh báo tồn kho & Hết hạn
-  const lowStockItems = inventories.filter(i => i.quantity < 50);
-  
-  // Tìm các lô đã hết hạn nhưng chưa hủy (vẫn còn tồn kho > 0)
-  const expiredInventory = inventories.filter(i => {
-    const today = new Date();
-    const expiry = new Date(i.expiry_date);
-    return expiry < today && i.quantity > 0;
+  useEffect(() => {
+    Promise.all([
+      fetchOrders().catch(() => []),
+      getInventories().catch(() => []),
+      getProducts().catch(() => []),
+    ]).then(([o, inv, p]) => {
+      setOrders(Array.isArray(o) ? o : []);
+      setInventories(Array.isArray(inv) ? inv : []);
+      setProducts(Array.isArray(p) ? p : []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const activePlans = 0;
+  const pendingOrders = orders.filter((o) => o.status === 'WAITTING').length;
+  const lowStockItems = inventories.filter((i) => (i.quantity ?? 0) < 50);
+  const expiredInventory = inventories.filter((i) => {
+    const expiry = new Date(i.expiry_date || 0);
+    return expiry < new Date() && (i.quantity ?? 0) > 0;
   });
+  const pendingImportBatches = [];
+  const finishedProducts = products.filter((p) => p.product_type === 'FINISHED_PRODUCT');
 
-  // Flow 2 - B3: Tìm các lô hàng Bếp đã làm xong (DONE) nhưng chưa nhập kho (chưa có transaction IMPORT tương ứng)
-  const pendingImportBatches = logBatches.filter(b => {
-    if (b.status !== 'DONE' || b.type !== 'PRODUCTION') return false;
-    const hasImported = inventoryTransactions.some(t => t.batch_id === b.batch_id && t.type === 'IMPORT');
-    return !hasImported;
-  });
-
-  const finishedProducts = getFinishedProducts();
-
-  // Flow 2 - B3: Manager duyệt nhập kho
-  const handleImportBatch = (batch) => {
-    const newTransaction = {
-      transaction_id: inventoryTransactions.length + 1,
-      product_id: batch.product_id,
-      created_by: 2, // Manager ID
-      batch_id: batch.batch_id,
-      type: 'IMPORT',
-      quantity: batch.quantity,
-      created_at: new Date().toISOString(),
-      note: 'Nhập kho thành phẩm từ sản xuất'
-    };
-
-    inventoryTransactions.push(newTransaction);
-
-    // Cập nhật tồn kho
-    const existingInventory = inventories.find(i => i.batch_id === batch.batch_id);
-    if (existingInventory) {
-      existingInventory.quantity += batch.quantity;
-    } else {
-      inventories.push({
-        inventory_id: inventories.length + 1,
-        product_id: batch.product_id,
-        batch_id: batch.batch_id,
-        quantity: batch.quantity,
-        expiry_date: batch.expiry_date
-      });
-    }
-
-    notifyListeners();
-    toast.success(`Đã nhập kho lô #${batch.batch_id} thành công!`);
+  const handleImportBatch = () => {
+    toast.info('Chức năng nhập kho từ lô sản xuất cần API Production Batches.');
   };
 
-  // Flow 4 - B2: Xử lý hủy hàng
   const handleDisposeInventory = (inv) => {
-    const newTransaction = {
-      transaction_id: inventoryTransactions.length + 1,
-      product_id: inv.product_id,
-      created_by: 2, // Manager ID
-      batch_id: inv.batch_id,
-      type: 'EXPORT',
-      quantity: inv.quantity,
-      created_at: new Date().toISOString(),
-      note: 'Hủy hàng hết hạn (Flow 4)'
-    };
-
-    inventoryTransactions.push(newTransaction);
-    
-    // Trừ tồn kho về 0
-    inv.quantity = 0;
-
-    notifyListeners();
-    toast.error(`Đã tiêu hủy lô hàng hết hạn #${inv.batch_id}`);
+    toast.info('Chức năng tiêu hủy hàng hết hạn cần API Inventory Transactions (EXPORT).');
   };
 
-  // Data cho biểu đồ tồn kho thành phẩm
-  const stockData = finishedProducts.map(p => {
+  const stockData = finishedProducts.map((p) => {
     const totalStock = inventories
-      .filter(i => i.product_id === p.product_id)
-      .reduce((sum, i) => sum + i.quantity, 0);
-    return {
-      name: p.product_name,
-      stock: totalStock
-    };
+      .filter((i) => i.product_id === p.product_id)
+      .reduce((sum, i) => sum + (i.quantity ?? 0), 0);
+    return { name: p.product_name, stock: totalStock };
   });
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[200px]">
+        <p className="text-muted-foreground">Đang tải...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Tổng quan Quản lý</h1>
-        <p className="text-muted-foreground">Theo dõi sản xuất, tồn kho và duyệt nhập kho (Flow 2 & 4)</p>
+        <p className="text-muted-foreground">
+          Theo dõi sản xuất, tồn kho và duyệt nhập kho (Flow 2 & 4)
+        </p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -167,60 +118,61 @@ export default function ManagerDashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Flow 2 - B3: Duyệt nhập kho */}
-        <Card className="col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle>Duyệt nhập kho thành phẩm</CardTitle>
             <CardDescription>Các lô hàng Bếp đã hoàn thành (Flow 2-B3)</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {pendingImportBatches.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Không có lô hàng nào cần nhập kho.</p>
-              ) : (
-                pendingImportBatches.map(batch => {
-                  const product = finishedProducts.find(p => p.product_id === batch.product_id);
-                  return (
-                    <div key={batch.batch_id} className="flex items-center justify-between border-b pb-3 last:border-0">
-                      <div>
-                        <p className="font-medium">{product?.product_name || `SP #${batch.product_id}`}</p>
-                        <div className="flex gap-2 text-xs text-muted-foreground mt-1">
-                          <Badge variant="outline">Lô #{batch.batch_id}</Badge>
-                          <span>SL: {batch.quantity}</span>
-                          <span>HSD: {batch.expiry_date}</span>
-                        </div>
-                      </div>
-                      <Button size="sm" onClick={() => handleImportBatch(batch)}>
-                        <PackageCheck className="mr-2 h-4 w-4" />
-                        Nhập kho
-                      </Button>
+            {pendingImportBatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Không có lô hàng nào cần nhập kho. (Cần API Production Batches)
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {pendingImportBatches.map((batch) => (
+                  <div
+                    key={batch.batch_id}
+                    className="flex items-center justify-between border-b pb-3 last:border-0"
+                  >
+                    <div>
+                      <p className="font-medium">Lô #{batch.batch_id}</p>
+                      <span>SL: {batch.quantity}</span>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <Button size="sm" onClick={handleImportBatch}>
+                      <PackageCheck className="mr-2 h-4 w-4" />
+                      Nhập kho
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Biểu đồ tồn kho */}
-        <Card className="col-span-1">
+        <Card>
           <CardHeader>
             <CardTitle>Tồn kho thành phẩm hiện tại</CardTitle>
           </CardHeader>
           <CardContent className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stockData} layout="vertical" margin={{ left: 20 }}>
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
-                <Tooltip />
-                <Bar dataKey="stock" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
-              </BarChart>
-            </ResponsiveContainer>
+            {stockData.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Chưa có dữ liệu
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stockData} layout="vertical" margin={{ left: 20 }}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="stock" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Flow 4: Cảnh báo hàng hết hạn */}
       {expiredInventory.length > 0 && (
         <Card className="border-red-200 bg-red-50">
           <CardHeader>
@@ -231,15 +183,26 @@ export default function ManagerDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {expiredInventory.map(inv => {
-                const product = finishedProducts.find(p => p.product_id === inv.product_id) || {};
+              {expiredInventory.map((inv) => {
+                const product = finishedProducts.find((p) => p.product_id === inv.product_id) || {};
                 return (
-                  <div key={inv.inventory_id} className="flex items-center justify-between bg-white p-3 rounded border border-red-100">
+                  <div
+                    key={inv.inventory_id}
+                    className="flex items-center justify-between bg-white p-3 rounded border border-red-100"
+                  >
                     <div>
-                      <p className="font-medium text-red-900">{product.product_name || `SP #${inv.product_id}`}</p>
-                      <p className="text-sm text-red-700">Lô: {inv.batch_id} - SL: {inv.quantity} - Hết hạn: {inv.expiry_date}</p>
+                      <p className="font-medium text-red-900">
+                        {product.product_name || `SP #${inv.product_id}`}
+                      </p>
+                      <p className="text-sm text-red-700">
+                        Lô: {inv.batch_id} - SL: {inv.quantity} - Hết hạn: {inv.expiry_date}
+                      </p>
                     </div>
-                    <Button variant="destructive" size="sm" onClick={() => handleDisposeInventory(inv)}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDisposeInventory(inv)}
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Tiêu hủy
                     </Button>

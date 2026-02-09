@@ -1,6 +1,6 @@
 import React from 'react';
 import { Badge } from '../ui/badge';
-import { ORDER_STATUS, DELIVERY_STATUS, BATCH_STATUS } from '../../data/mockData';
+import { ORDER_STATUS, DELIVERY_STATUS, BATCH_STATUS } from '../../data/constants';
 
 export function StatusBadge({ status, type = 'order' }) {
   const statusMap = {

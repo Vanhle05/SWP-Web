@@ -1,25 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { 
-  orders, 
-  orderDetails, 
-  getProductById,
-  notifyListeners,
-  useMockDataWatcher
-} from '../../data/mockData';
+import { getOrdersByStore, updateOrderStatus } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { EmptyState } from '../../components/common/EmptyState';
-import { 
-  Package, 
-  Calendar, 
-  Clock, 
-  ChevronDown, 
+import {
+  Package,
+  Calendar,
+  ChevronDown,
   ChevronUp,
   X,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -40,46 +32,63 @@ import { toast } from 'sonner';
 
 export default function OrderHistory() {
   const { user } = useAuth();
-  // This hook forces the component to re-render when mock data is mutated
-  useMockDataWatcher();
-
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [openOrders, setOpenOrders] = useState([]);
   const [cancelOrder, setCancelOrder] = useState(null);
 
-  // Filter orders by store
-  const storeOrders = orders
-    .filter(o => o.store_id === user?.store_id)
-    .sort((a, b) => new Date(b.order_date) - new Date(a.order_date));
+  useEffect(() => {
+    if (!user?.store_id) {
+      setLoading(false);
+      return;
+    }
+    getOrdersByStore(user.store_id)
+      .then((data) => setOrders(Array.isArray(data) ? data : []))
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }, [user?.store_id]);
+
+  const storeOrders = [...orders].sort(
+    (a, b) => new Date(b.order_date || 0) - new Date(a.order_date || 0)
+  );
 
   const toggleOrder = (orderId) => {
-    setOpenOrders(prev => 
-      prev.includes(orderId) 
-        ? prev.filter(id => id !== orderId)
-        : [...prev, orderId]
+    setOpenOrders((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
     );
   };
 
   const handleCancelOrder = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-    const orderToCancel = orders.find(o => o.order_id === cancelOrder.order_id);
-    if (orderToCancel) {
-      orderToCancel.status = 'CANCLED';
+    if (!cancelOrder) return;
+    try {
+      await updateOrderStatus(cancelOrder.order_id, 'CANCLED');
+      setOrders((prev) =>
+        prev.map((o) => (o.order_id === cancelOrder.order_id ? { ...o, status: 'CANCLED' } : o))
+      );
+      toast.success('Đơn hàng đã được hủy thành công');
+    } catch (e) {
+      toast.error(e.message || 'Hủy đơn thất bại');
     }
-    notifyListeners();
-    toast.success('Đơn hàng đã được hủy thành công');
     setCancelOrder(null);
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
+    return new Date(dateString).toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[200px]">
+        <p className="text-muted-foreground">Đang tải...</p>
+      </div>
+    );
+  }
 
   if (storeOrders.length === 0) {
     return (
@@ -97,17 +106,15 @@ export default function OrderHistory() {
     <div className="p-6 space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Lịch sử đơn hàng</h1>
-        <p className="text-muted-foreground">
-          Theo dõi và quản lý các đơn hàng của cửa hàng
-        </p>
+        <p className="text-muted-foreground">Theo dõi và quản lý các đơn hàng của cửa hàng</p>
       </div>
 
       <div className="space-y-4">
         {storeOrders.map((order) => {
-          const details = orderDetails.filter(od => od.order_id === order.order_id);
+          const details = order.order_details || [];
           const isOpen = openOrders.includes(order.order_id);
           const canCancel = order.status === 'WAITTING';
-          
+
           return (
             <Card key={order.order_id} className="overflow-hidden">
               <Collapsible open={isOpen} onOpenChange={() => toggleOrder(order.order_id)}>
@@ -156,45 +163,20 @@ export default function OrderHistory() {
                     </div>
                   </CardHeader>
                 </CollapsibleTrigger>
-                
                 <CollapsibleContent>
                   <CardContent className="border-t pt-4">
                     <div className="space-y-3">
-                      {details.map((detail) => {
-                        const product = getProductById(detail.product_id);
-                        return (
-                          <div 
-                            key={detail.order_detail_id}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-2xl">{product?.image || '🍞'}</span>
-                              <div>
-                                <p className="font-medium">{product?.product_name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {product?.price?.toLocaleString('vi-VN')}đ / {product?.unit}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-medium">x{detail.quantity}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {((product?.price || 0) * detail.quantity).toLocaleString('vi-VN')}đ
-                              </p>
-                            </div>
+                      {details.map((detail) => (
+                        <div
+                          key={detail.order_detail_id || detail.product_id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                        >
+                          <div>
+                            <p className="font-medium">{detail.product_name || `SP #${detail.product_id}`}</p>
+                            <p className="text-sm text-muted-foreground">x{detail.quantity}</p>
                           </div>
-                        );
-                      })}
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                      <span className="text-muted-foreground">Tổng tiền</span>
-                      <span className="text-lg font-bold text-primary">
-                        {details.reduce((sum, d) => {
-                          const product = getProductById(d.product_id);
-                          return sum + (product?.price || 0) * d.quantity;
-                        }, 0).toLocaleString('vi-VN')}đ
-                      </span>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </CollapsibleContent>
@@ -204,7 +186,6 @@ export default function OrderHistory() {
         })}
       </div>
 
-      {/* Cancel Confirmation Dialog */}
       <AlertDialog open={!!cancelOrder} onOpenChange={() => setCancelOrder(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -215,13 +196,12 @@ export default function OrderHistory() {
             </div>
             <AlertDialogTitle className="text-center">Xác nhận hủy đơn hàng</AlertDialogTitle>
             <AlertDialogDescription className="text-center">
-              Bạn có chắc chắn muốn hủy đơn hàng #{cancelOrder?.order_id}? 
-              Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn hủy đơn hàng #{cancelOrder?.order_id}? Hành động này không thể hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Quay lại</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleCancelOrder}
               className="bg-destructive hover:bg-destructive/90"
             >

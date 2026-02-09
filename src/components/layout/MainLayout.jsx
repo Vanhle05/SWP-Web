@@ -15,7 +15,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Bell } from 'lucide-react';
-import { notifications, fetchOrders } from '../../data/mockData';
+import { fetchOrders } from '../../data/api';
 
 const breadcrumbMap = {
   '/store': 'Đặt hàng',
@@ -79,8 +79,9 @@ export function MainLayout() {
   const currentPage = breadcrumbMap[location.pathname] || 'Trang chủ';
   const isHomePage = location.pathname === homePath;
 
-  const userNotifications = notifications.filter(n => n.user_id === user.user_id);
-  const unreadCount = userNotifications.filter(n => !n.read).length;
+  // Thông báo: backend chưa có API notifications, dùng mảng rỗng
+  const userNotifications = [];
+  const unreadCount = 0;
 
   return (
     <SidebarProvider>

@@ -1,16 +1,9 @@
-import React, { useState } from 'react';
-import { 
-  inventories, 
-  logBatches,
-  products,
-  getProductById,
-  PRODUCT_TYPE,
-  BATCH_STATUS 
-} from '../../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { getInventories, getProducts } from '../../data/api';
+import { PRODUCT_TYPE } from '../../data/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
-import { StatusBadge } from '../../components/common/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import {
   Table,
@@ -20,48 +13,57 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { 
-  Search, 
-  Package, 
-  AlertTriangle,
-  Calendar
-} from 'lucide-react';
+import { Search, Package, AlertTriangle, Calendar } from 'lucide-react';
 
 export default function Inventory() {
+  const [inventories, setInventories] = useState([]);
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // Enrich inventory data
-  const enrichedInventory = inventories.map(inv => {
+  useEffect(() => {
+    Promise.all([getInventories().catch(() => []), getProducts().catch(() => [])]).then(
+      ([invRes, prodRes]) => {
+        setInventories(Array.isArray(invRes) ? invRes : []);
+        setProducts(Array.isArray(prodRes) ? prodRes : []);
+      }
+    ).finally(() => setLoading(false));
+  }, []);
+
+  const getProductById = (id) => products.find((p) => p.product_id === id);
+
+  const enrichedInventory = inventories.map((inv) => {
     const product = getProductById(inv.product_id);
-    const batch = logBatches.find(b => b.batch_id === inv.batch_id);
     const today = new Date();
-    const expiry = new Date(inv.expiry_date);
+    const expiry = new Date(inv.expiry_date || 0);
     const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-    
     return {
       ...inv,
       product,
-      batch,
       daysUntilExpiry,
       isExpiringSoon: daysUntilExpiry <= 3 && daysUntilExpiry > 0,
       isExpired: daysUntilExpiry <= 0,
-      isLowStock: inv.quantity < 20
+      isLowStock: (inv.quantity ?? 0) < 20,
     };
   });
 
-  // Filter by search
-  const filteredInventory = enrichedInventory.filter(inv =>
-    inv.product?.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredInventory = enrichedInventory.filter((inv) =>
+    (inv.product?.product_name || inv.product_name || '')
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
   );
 
-  // Group by product type
-  const rawMaterials = filteredInventory.filter(inv => inv.product?.product_type === 'RAW_MATERIAL');
-  const semiFinished = filteredInventory.filter(inv => inv.product?.product_type === 'SEMI_FINISHED');
-  const finishedProducts = filteredInventory.filter(inv => inv.product?.product_type === 'FINISHED_PRODUCT');
+  const rawMaterials = filteredInventory.filter(
+    (inv) => inv.product?.product_type === 'RAW_MATERIAL'
+  );
+  const semiFinished = filteredInventory.filter(
+    (inv) => inv.product?.product_type === 'SEMI_FINISHED'
+  );
+  const finishedProducts = filteredInventory.filter(
+    (inv) => inv.product?.product_type === 'FINISHED_PRODUCT'
+  );
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  };
+  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('vi-VN');
 
   const InventoryTable = ({ items, title }) => (
     <Card>
@@ -70,9 +72,7 @@ export default function Inventory() {
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Không có sản phẩm nào
-          </div>
+          <div className="text-center py-8 text-muted-foreground">Không có sản phẩm nào</div>
         ) : (
           <Table>
             <TableHeader>
@@ -91,16 +91,14 @@ export default function Inventory() {
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{inv.product?.image}</span>
                       <div>
-                        <p className="font-medium">{inv.product?.product_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {inv.product?.unit}
-                        </p>
+                        <p className="font-medium">{inv.product?.product_name ?? inv.product_name}</p>
+                        <p className="text-xs text-muted-foreground">{inv.product?.unit}</p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     {inv.batch ? (
-                      <Badge variant="outline">#{inv.batch.batch_id}</Badge>
+                      <Badge variant="outline">#{inv.batch.batchId ?? inv.batch.batch_id}</Badge>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -113,19 +111,18 @@ export default function Inventory() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className={
-                        inv.isExpired ? 'text-destructive' : 
-                        inv.isExpiringSoon ? 'text-warning' : ''
-                      }>
+                      <span
+                        className={
+                          inv.isExpired ? 'text-destructive' : inv.isExpiringSoon ? 'text-warning' : ''
+                        }
+                      >
                         {formatDate(inv.expiry_date)}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      {inv.isExpired && (
-                        <Badge variant="destructive">Hết hạn</Badge>
-                      )}
+                      {inv.isExpired && <Badge variant="destructive">Hết hạn</Badge>}
                       {inv.isExpiringSoon && !inv.isExpired && (
                         <Badge className="status-warning">Sắp hết hạn</Badge>
                       )}
@@ -146,24 +143,26 @@ export default function Inventory() {
     </Card>
   );
 
-  // Summary stats
   const totalItems = enrichedInventory.length;
-  const lowStockCount = enrichedInventory.filter(i => i.isLowStock).length;
-  const expiringSoonCount = enrichedInventory.filter(i => i.isExpiringSoon).length;
-  const expiredCount = enrichedInventory.filter(i => i.isExpired).length;
+  const lowStockCount = enrichedInventory.filter((i) => i.isLowStock).length;
+  const expiringSoonCount = enrichedInventory.filter((i) => i.isExpiringSoon).length;
+  const expiredCount = enrichedInventory.filter((i) => i.isExpired).length;
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[200px]">
+        <p className="text-muted-foreground">Đang tải...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quản lý tồn kho</h1>
-          <p className="text-muted-foreground">
-            Theo dõi và quản lý hàng tồn kho
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Quản lý tồn kho</h1>
+        <p className="text-muted-foreground">Theo dõi và quản lý hàng tồn kho</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -211,7 +210,6 @@ export default function Inventory() {
         </Card>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -222,28 +220,18 @@ export default function Inventory() {
         />
       </div>
 
-      {/* Inventory Tables */}
       <Tabs defaultValue="finished" className="w-full">
         <TabsList>
-          <TabsTrigger value="finished">
-            Thành phẩm ({finishedProducts.length})
-          </TabsTrigger>
-          <TabsTrigger value="semi">
-            Bán thành phẩm ({semiFinished.length})
-          </TabsTrigger>
-          <TabsTrigger value="raw">
-            Nguyên liệu ({rawMaterials.length})
-          </TabsTrigger>
+          <TabsTrigger value="finished">Thành phẩm ({finishedProducts.length})</TabsTrigger>
+          <TabsTrigger value="semi">Bán thành phẩm ({semiFinished.length})</TabsTrigger>
+          <TabsTrigger value="raw">Nguyên liệu ({rawMaterials.length})</TabsTrigger>
         </TabsList>
-
         <TabsContent value="finished" className="mt-6">
           <InventoryTable items={finishedProducts} title="Thành phẩm" />
         </TabsContent>
-
         <TabsContent value="semi" className="mt-6">
           <InventoryTable items={semiFinished} title="Bán thành phẩm" />
         </TabsContent>
-
         <TabsContent value="raw" className="mt-6">
           <InventoryTable items={rawMaterials} title="Nguyên liệu" />
         </TabsContent>

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { products, PRODUCT_TYPE } from '../../data/mockData';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { getProducts } from '../../data/api';
+import { PRODUCT_TYPE } from '../../data/constants';
+import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
@@ -13,25 +14,26 @@ import {
   TableHeader,
   TableRow,
 } from '../../components/ui/table';
-import { 
-  Search, 
-  Plus, 
-  Edit, 
-  Package,
-  Leaf,
-  Cookie
-} from 'lucide-react';
+import { Search, Plus, Edit, Package, Leaf, Cookie } from 'lucide-react';
 
 export default function Products() {
+  const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const filteredProducts = products.filter(p =>
-    p.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    getProducts()
+      .then((data) => setProducts(Array.isArray(data) ? data : []))
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredProducts = products.filter((p) =>
+    (p.product_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const rawMaterials = filteredProducts.filter(p => p.product_type === 'RAW_MATERIAL');
-  const semiFinished = filteredProducts.filter(p => p.product_type === 'SEMI_FINISHED');
-  const finishedProducts = filteredProducts.filter(p => p.product_type === 'FINISHED_PRODUCT');
+  const rawMaterials = filteredProducts.filter((p) => p.product_type === 'RAW_MATERIAL');
+  const semiFinished = filteredProducts.filter((p) => p.product_type === 'SEMI_FINISHED');
+  const finishedProducts = filteredProducts.filter((p) => p.product_type === 'FINISHED_PRODUCT');
 
   const ProductTable = ({ items }) => (
     <Table>
@@ -60,12 +62,7 @@ export default function Products() {
             </TableCell>
             <TableCell>{product.unit}</TableCell>
             <TableCell>{product.shelf_life_days} ngày</TableCell>
-            <TableCell>
-              {product.price 
-                ? `${product.price.toLocaleString('vi-VN')}đ` 
-                : '-'
-              }
-            </TableCell>
+            <TableCell>{product.price ? `${product.price.toLocaleString('vi-VN')}đ` : '-'}</TableCell>
             <TableCell className="text-right">
               <Button variant="ghost" size="icon">
                 <Edit className="h-4 w-4" />
@@ -77,14 +74,20 @@ export default function Products() {
     </Table>
   );
 
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[200px]">
+        <p className="text-muted-foreground">Đang tải...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Quản lý sản phẩm</h1>
-          <p className="text-muted-foreground">
-            Quản lý danh sách sản phẩm trong hệ thống
-          </p>
+          <p className="text-muted-foreground">Quản lý danh sách sản phẩm trong hệ thống</p>
         </div>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -92,7 +95,6 @@ export default function Products() {
         </Button>
       </div>
 
-      {/* Search */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -103,7 +105,6 @@ export default function Products() {
         />
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="finished" className="w-full">
         <TabsList>
           <TabsTrigger value="finished" className="flex items-center gap-2">
@@ -119,7 +120,6 @@ export default function Products() {
             Nguyên liệu ({rawMaterials.length})
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="finished" className="mt-6">
           <Card>
             <CardContent className="pt-6">
@@ -127,7 +127,6 @@ export default function Products() {
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="semi" className="mt-6">
           <Card>
             <CardContent className="pt-6">
@@ -135,7 +134,6 @@ export default function Products() {
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="raw" className="mt-6">
           <Card>
             <CardContent className="pt-6">

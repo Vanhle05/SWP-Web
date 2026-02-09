@@ -1,0 +1,29 @@
+// Constants for status labels and product types (used across app, no API)
+
+export const ORDER_STATUS = {
+  WAITTING: { label: 'Chờ xử lý', color: 'warning', class: 'status-waiting' },
+  PROCESSING: { label: 'Đang xử lý', color: 'info', class: 'status-processing' },
+  DELIVERING: { label: 'Đang giao', color: 'purple', class: 'status-delivering' },
+  DONE: { label: 'Hoàn thành', color: 'success', class: 'status-done' },
+  DAMAGED: { label: 'Hư hỏng', color: 'destructive', class: 'status-damaged' },
+  CANCLED: { label: 'Đã hủy', color: 'muted', class: 'status-cancelled' },
+};
+
+export const DELIVERY_STATUS = {
+  WAITTING: { label: 'Chờ giao', color: 'warning', class: 'status-waiting' },
+  PROCESSING: { label: 'Đang giao', color: 'info', class: 'status-processing' },
+  DONE: { label: 'Hoàn thành', color: 'success', class: 'status-done' },
+};
+
+export const BATCH_STATUS = {
+  PROCESSING: { label: 'Đang sản xuất', color: 'info', class: 'status-processing' },
+  DONE: { label: 'Hoàn thành', color: 'success', class: 'status-done' },
+  EXPIRED: { label: 'Hết hạn', color: 'destructive', class: 'status-damaged' },
+  DAMAGED: { label: 'Hư hỏng', color: 'destructive', class: 'status-damaged' },
+};
+
+export const PRODUCT_TYPE = {
+  RAW_MATERIAL: { label: 'Nguyên liệu', color: 'blue' },
+  SEMI_FINISHED: { label: 'Bán thành phẩm', color: 'orange' },
+  FINISHED_PRODUCT: { label: 'Thành phẩm', color: 'green' },
+};

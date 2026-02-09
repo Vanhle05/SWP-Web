@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { users, stores, roles } from '../data/mockData';
 import { Loader2 } from 'lucide-react';
 
 const AuthContext = createContext(null);
@@ -47,20 +46,10 @@ export const AuthProvider = ({ children }) => {
 
   const login = (userData) => {
     if (userData && userData.user) {
-      const apiUser = userData.user;
-      // Tìm role và store tương ứng từ mockData để làm giàu dữ liệu user
-      const role = roles.find(r => r.role_id === apiUser.role_id);
-      const store = apiUser.store_id
-        ? stores.find(s => s.store_id === apiUser.store_id)
-        : null;
-
       const fullUserData = {
-        ...apiUser,
-        role: role,
-        store: store,
+        ...userData.user,
         token: userData.token,
       };
-
       setUser(fullUserData);
       sessionStorage.setItem('kitchen_user', JSON.stringify(fullUserData));
     }
