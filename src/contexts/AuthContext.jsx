@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 const AuthContext = createContext(null);
@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   // Khởi tạo isLoading là true để chặn render MainLayout cho đến khi check xong localStorage
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const initializeAuth = () => {
@@ -34,7 +35,7 @@ export const AuthProvider = ({ children }) => {
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser);
           // Kiểm tra đơn giản xem user có hợp lệ không (có id và role)
-          if (parsedUser && parsedUser.user_id && parsedUser.role_id) {
+          if (parsedUser && (parsedUser.user_id || parsedUser.userId) && parsedUser.role_id) {
             setUser(parsedUser);
           } else {
             // Nếu dữ liệu rác, xóa ngay
@@ -64,19 +65,15 @@ export const AuthProvider = ({ children }) => {
       setUser(fullUserData);
       sessionStorage.setItem('kitchen_user', JSON.stringify(fullUserData));
 
-      // FIX: Buộc chuyển hướng sang trang của Role ngay lập tức
-      // Sử dụng window.location.href để đảm bảo App reload lại với context mới
-      const roleId = Number(fullUserData.role_id);
-      const rolePath = ROLE_PATHS[roleId] || '/login';
-      window.location.href = rolePath;
+      // Không cần navigate ở đây nữa vì Login.jsx đã xử lý.
+      // Việc navigate ở đây gây ra xung đột và double navigation.
     }
   };
 
   const logout = () => {
     setUser(null);
     sessionStorage.removeItem('kitchen_user');
-    // Có thể thêm điều hướng về login tại đây hoặc để MainLayout tự xử lý
-    window.location.href = '/login'; 
+    navigate('/login', { replace: true });
   };
 
   // --- Tự động Logout sau 5 phút không tương tác ---
@@ -154,12 +151,16 @@ export const ProtectedRoute = ({ allowedRoles = [], children }) => {
     return null; // Hoặc return <Loader2 ... /> nếu muốn hiện loading spinner
   }
 
-  if (!user) {
+  // Fix Race Condition: Kiểm tra cả user trong state VÀ sessionStorage
+  // Khi vừa login xong, state có thể chưa kịp update nhưng sessionStorage đã có
+  const effectiveUser = user || JSON.parse(sessionStorage.getItem('kitchen_user'));
+
+  if (!effectiveUser) {
     // Redirect về login, lưu lại trang đang truy cập để redirect lại sau khi login xong (nếu cần)
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const roleId = user.role_id != null ? Number(user.role_id) : null;
+  const roleId = effectiveUser.role_id != null ? Number(effectiveUser.role_id) : null;
   const isAllowed =
     !Array.isArray(allowedRoles) ||
     allowedRoles.length === 0 ||

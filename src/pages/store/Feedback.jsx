@@ -33,9 +33,22 @@ export default function Feedback() {
       .finally(() => setLoading(false));
   }, [user?.store_id]);
 
+  // BR-027: Chỉ cho phép đánh giá trong vòng 24h kể từ khi đơn hàng được chuyển sang DONE.
+  const isWithinFeedbackWindow = (doneDateString) => {
+    if (!doneDateString) return false;
+    const doneDate = new Date(doneDateString);
+    const now = new Date();
+    const twentyFourHoursInMillis = 24 * 60 * 60 * 1000;
+    return now - doneDate < twentyFourHoursInMillis;
+  };
+
   const completedOrders = orders.filter((o) => o.store_id === user?.store_id && o.status === 'DONE');
   const orderIdsWithFeedback = new Set(feedbacks.map((f) => f.order_id));
-  const completedOrdersPendingFeedback = completedOrders.filter((o) => !orderIdsWithFeedback.has(o.order_id));
+  // Lọc các đơn hàng chưa có feedback VÀ còn trong thời hạn 24 giờ.
+  const completedOrdersPendingFeedback = completedOrders.filter(
+    (o) => !orderIdsWithFeedback.has(o.order_id) && isWithinFeedbackWindow(o.order_date) // Giả định order_date là thời điểm DONE cho mock
+  );
+
   const ratedOrders = orders.filter((o) => o.store_id === user?.store_id && orderIdsWithFeedback.has(o.order_id));
 
   const handleSubmitFeedback = async () => {

@@ -31,6 +31,9 @@ import ProductionPlanning from "./pages/manager/ProductionPlanning";
 import KitchenDashboard from "./pages/kitchen/Dashboard";
 import Inventory from "./pages/kitchen/Inventory";
 import Production from "./pages/kitchen/Production";
+import Outbound from "./pages/kitchen/Outbound";
+import Procurement from "./pages/kitchen/Procurement";
+import Waste from "./pages/kitchen/Waste";
 
 // Shipper pages
 import MyTrips from "./pages/shipper/MyTrips";
@@ -54,12 +57,12 @@ const ComingSoon = ({ title }) => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <CartProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <CartProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
@@ -90,10 +93,10 @@ const App = () => (
                 {/* Kitchen routes */}
                 <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.KITCHEN_MANAGER]}><Outlet /></ProtectedRoute>}>
                   <Route path="/kitchen" element={<KitchenDashboard />} />
-                  <Route path="/kitchen/outbound" element={<ComingSoon title="Xuất kho giao hàng" />} />
+                  <Route path="/kitchen/outbound" element={<Outbound />} />
                   <Route path="/kitchen/production" element={<Production />} />
-                  <Route path="/kitchen/procurement" element={<ComingSoon title="Nhập nguyên liệu" />} />
-                  <Route path="/kitchen/waste" element={<ComingSoon title="Quản lý hủy hàng" />} />
+                  <Route path="/kitchen/procurement" element={<Procurement />} />
+                  <Route path="/kitchen/waste" element={<Waste />} />
                   <Route path="/kitchen/inventory" element={<Inventory />} />
                 </Route>
 
@@ -121,10 +124,10 @@ const App = () => (
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </CartProvider>
-    </AuthProvider>
+          </TooltipProvider>
+        </CartProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

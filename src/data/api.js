@@ -30,7 +30,19 @@ const MOCK_DB = {
       orderDetails: [{ productName: 'Pizza Bò', quantity: 2 }, { productName: 'Coke', quantity: 5 }]
     }
   ],
-  feedbacks: []
+  feedbacks: [],
+  products: [
+    { productId: 201, productName: 'Thịt Heo', productType: 'RAW_MATERIAL', unit: 'kg' },
+    { productId: 202, productName: 'Bột Gạo', productType: 'RAW_MATERIAL', unit: 'kg' },
+    { productId: 101, productName: 'Thịt bò Úc', productType: 'RAW_MATERIAL', unit: 'kg' },
+    { productId: 102, productName: 'Cà chua', productType: 'RAW_MATERIAL', unit: 'kg' },
+    { productId: 103, productName: 'Bột mì', productType: 'RAW_MATERIAL', unit: 'kg' },
+    { productId: 301, productName: 'Pizza Bò', productType: 'FINISHED_PRODUCT', unit: 'cái' },
+  ],
+  log_batches: [
+    { batchId: 'B231001', type: 'PRODUCTION', productId: 101, status: 'DONE', expiryDate: '2023-10-01' },
+    { batchId: 'B231025', type: 'PRODUCTION', productId: 102, status: 'DONE', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString() },
+  ]
 };
 
 // Helper delay để giả lập mạng chậm
@@ -321,6 +333,10 @@ export const getOrdersByStore = async (storeId) => {
 // --- Product API (trả về snake_case) ---
 
 export const getProducts = async () => {
+  if (USE_MOCK_DATA) {
+    await delay(300);
+    return MOCK_DB.products.map(mapProduct);
+  }
   const data = await handleResponse(await fetch(`${API_BASE_URL}/products`));
   return Array.isArray(data) ? data.map(mapProduct) : data;
 };
@@ -503,6 +519,47 @@ export const getInventories = async () => {
 export const getInventoryById = async (inventoryId) => {
   const response = await fetch(`${API_BASE_URL}/inventories/get-by-id/${inventoryId}`);
   return await handleResponse(response);
+};
+
+// --- Log Batches API (cho Flow 3: Procurement) ---
+
+export const createPurchaseBatch = async (batchData) => {
+  if (USE_MOCK_DATA) {
+    await delay(700);
+    const { productId, batch, quantity, expiryDate } = batchData;
+
+    // BR-022: Logic cảnh báo HSD gần sẽ được xử lý ở UI, API chỉ ghi nhận.
+    console.log("MOCK API: Received data for new batch:", batchData);
+
+    // Flow 3 - B2: Tạo bản ghi log_batches
+    const newBatchLog = {
+      batchId: batch,
+      type: 'PURCHASE',
+      productId,
+      status: 'DONE', // Theo yêu cầu, hàng mua về là DONE
+      expiryDate,
+      createdAt: new Date().toISOString(),
+    };
+    MOCK_DB.log_batches.push(newBatchLog);
+
+    // Flow 3 - B3: Tự động tăng tồn kho (tạo bản ghi inventory)
+    const product = MOCK_DB.products.find(p => p.productId === productId);
+    const newInventoryItem = {
+      inventoryId: MOCK_DB.inventories.length + 100, // Dùng số lớn để tránh trùng
+      productId,
+      productName: product?.productName || 'Unknown Product',
+      batch,
+      quantity: Number(quantity),
+      expiryDate,
+    };
+    MOCK_DB.inventories.push(newInventoryItem);
+    
+    console.log("MOCK DB: Updated inventories", MOCK_DB.inventories);
+    return mapInventory(newInventoryItem);
+  }
+
+  // API thật sẽ gọi endpoint tương ứng
+  throw new Error("API thật cho createPurchaseBatch chưa được định nghĩa.");
 };
 
 // --- Quality Feedback API (trả về snake_case) ---

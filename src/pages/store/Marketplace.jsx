@@ -1,125 +1,190 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCart } from '../../contexts/CartContext';
-import { getProducts, getInventories } from '../../data/api';
-import { ProductCard } from '../../components/common/ProductCard';
+import { getProducts, getInventories, getOrdersByStore, createOrder } from '../../data/api';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
 import { Input } from '../../components/ui/input';
-import { ShoppingCart, Search, Loader2 } from 'lucide-react';
+import { Badge } from '../../components/ui/badge';
+import { ShoppingCart, Plus, Minus, Package, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-
-function getAvailableStock(inventories, productId) {
-  if (!Array.isArray(inventories)) return 0;
-  return inventories
-    .filter((inv) => inv.product_id === productId)
-    .reduce((sum, inv) => sum + (inv.quantity ?? 0), 0);
-}
+import { cn } from '../../lib/utils';
 
 export default function Marketplace() {
   const { user } = useAuth();
-  const { addItem, getTotalItems } = useCart();
-  const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
   const [products, setProducts] = useState([]);
   const [inventories, setInventories] = useState([]);
+  const [activeOrders, setActiveOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cart, setCart] = useState({}); // { productId: quantity }
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
+    const fetchData = async () => {
       try {
-        const [productsRes, inventoriesRes] = await Promise.all([
+        const [productsRes, inventoriesRes, ordersRes] = await Promise.all([
           getProducts(),
-          getInventories().catch(() => []),
+          getInventories(),
+          getOrdersByStore(user?.store_id) // Lấy đơn của store để tính reserved stock (nếu cần logic phức tạp hơn thì lấy all orders)
         ]);
-        if (!cancelled) {
-          setProducts(Array.isArray(productsRes) ? productsRes : []);
-          setInventories(Array.isArray(inventoriesRes) ? inventoriesRes : []);
-        }
-      } catch (e) {
-        if (!cancelled) toast.error('Không tải được danh sách sản phẩm');
+
+        // Chỉ lấy sản phẩm thành phẩm để bán
+        setProducts(productsRes.filter(p => p.product_type === 'FINISHED_PRODUCT'));
+        setInventories(inventoriesRes || []);
+        
+        // Lọc các đơn hàng đang chờ xử lý (WAITING/PROCESSING) để trừ tồn kho ảo
+        // Lưu ý: Ở môi trường thật, API nên trả về available_stock sẵn. Ở đây ta tính client-side theo BR-005.
+        const active = (ordersRes || []).filter(o => ['WAITTING', 'PROCESSING'].includes(o.status));
+        setActiveOrders(active);
+      } catch (error) {
+        console.error("Error loading marketplace:", error);
+        toast.error("Không thể tải dữ liệu sản phẩm");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
+    };
+    if (user?.store_id) fetchData();
+  }, [user?.store_id]);
 
-  const finishedProducts = products.filter((p) => p.product_type === 'FINISHED_PRODUCT');
-  const filteredProducts = finishedProducts.filter((p) =>
-    (p.product_name || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // BR-005: Tính Available Stock
+  const getAvailableStock = (productId) => {
+    // 1. Tổng tồn kho vật lý
+    const totalInventory = inventories
+      .filter(inv => inv.product_id === productId)
+      .reduce((sum, inv) => sum + Number(inv.quantity), 0);
 
-  const handleAddToCart = (product, quantity) => {
-    const availableStock = getAvailableStock(inventories, product.product_id);
-    if (quantity > availableStock) {
-      toast.error('Số lượng đặt vượt quá tồn kho khả dụng');
-      return;
-    }
-    addItem(product, quantity);
-    toast.success(`Đã thêm ${quantity} ${product.product_name} vào giỏ hàng`);
+    // 2. Tổng hàng đang giữ chỗ (Reserved) trong các đơn WAITING/PROCESSING
+    // Lưu ý: Logic này chỉ tính đơn của Store hiện tại nếu API getOrdersByStore chỉ trả về store hiện tại.
+    // Để chính xác tuyệt đối cần API trả về Global Reserved Stock. 
+    // Ở đây giả định mock data hoặc logic đơn giản.
+    const reservedStock = activeOrders.reduce((sum, order) => {
+      const detail = order.order_details?.find(d => d.product_id === productId);
+      return sum + (detail ? Number(detail.quantity) : 0);
+    }, 0);
+
+    return Math.max(0, totalInventory - reservedStock);
   };
 
-  const totalItems = getTotalItems();
+  const handleQuantityChange = (productId, delta) => {
+    setCart(prev => {
+      const currentQty = prev[productId] || 0;
+      const newQty = Math.max(0, currentQty + delta);
+      
+      // BR-006: Check tồn kho
+      const available = getAvailableStock(productId);
+      if (newQty > available) {
+        toast.warning(`Chỉ còn ${available} sản phẩm khả dụng`);
+        return prev;
+      }
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+      if (newQty === 0) {
+        const { [productId]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [productId]: newQty };
+    });
+  };
+
+  const handleCheckout = async () => {
+    const orderDetails = Object.entries(cart).map(([productId, quantity]) => ({
+      product_id: Number(productId),
+      quantity
+    }));
+
+    if (orderDetails.length === 0) {
+      toast.error("Giỏ hàng đang trống");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createOrder({
+        store_id: user.store_id,
+        comment: "Đặt hàng từ Marketplace",
+        orderDetails
+      });
+      toast.success("Đặt hàng thành công!");
+      setCart({});
+      // Reload data để cập nhật tồn kho
+      window.location.reload(); 
+    } catch (error) {
+      toast.error(error.message || "Đặt hàng thất bại");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center">Đang tải sản phẩm...</div>;
+
+  const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="p-6 space-y-6 animate-fade-in pb-24">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Đặt hàng</h1>
-          <p className="text-muted-foreground">
-            Xin chào, <span className="font-medium">{user?.full_name}</span> - {user?.store?.store_name}
-          </p>
+          <p className="text-muted-foreground">Chọn sản phẩm và thêm vào giỏ hàng</p>
         </div>
-        <Button onClick={() => navigate('/store/cart')} className="relative" size="lg">
-          <ShoppingCart className="h-5 w-5 mr-2" />
-          Giỏ hàng
-          {totalItems > 0 && (
-            <Badge className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center bg-destructive text-destructive-foreground">
-              {totalItems}
-            </Badge>
-          )}
-        </Button>
+        {totalItems > 0 && (
+          <Button onClick={handleCheckout} disabled={isSubmitting} className="gap-2 shadow-lg">
+            <ShoppingCart className="h-4 w-4" />
+            Đặt ngay ({totalItems})
+          </Button>
+        )}
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Tìm kiếm sản phẩm..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {products.map(product => {
+          const available = getAvailableStock(product.product_id);
+          const inCart = cart[product.product_id] || 0;
+          const isOutOfStock = available === 0;
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredProducts.map((product) => (
-          <ProductCard
-            key={product.product_id}
-            product={product}
-            availableStock={getAvailableStock(inventories, product.product_id)}
-            onAddToCart={handleAddToCart}
-          />
-        ))}
+          return (
+            <Card key={product.product_id} className={cn("flex flex-col", isOutOfStock && "opacity-70 bg-muted")}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <Badge variant={isOutOfStock ? "destructive" : "outline"} className="mb-2">
+                    {isOutOfStock ? "Hết hàng" : product.unit}
+                  </Badge>
+                  {inCart > 0 && <Badge variant="secondary">Đã chọn: {inCart}</Badge>}
+                </div>
+                <CardTitle className="text-lg">{product.product_name}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <div className="flex items-center justify-center h-32 bg-muted/20 rounded-md mb-4 text-4xl">
+                  {product.image || '📦'}
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Package className="h-4 w-4" />
+                  <span>Tồn kho khả dụng: <span className="font-bold text-foreground">{available}</span></span>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <div className="flex items-center justify-between w-full gap-2">
+                  <Button 
+                    variant="outline" size="icon" 
+                    onClick={() => handleQuantityChange(product.product_id, -1)}
+                    disabled={inCart === 0 || isSubmitting}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Input 
+                    className="text-center font-bold" 
+                    value={inCart} 
+                    readOnly 
+                  />
+                  <Button 
+                    variant="default" size="icon"
+                    onClick={() => handleQuantityChange(product.product_id, 1)}
+                    disabled={inCart >= available || isSubmitting || isOutOfStock}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardFooter>
+            </Card>
+          );
+        })}
       </div>
-
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Không tìm thấy sản phẩm nào</p>
-        </div>
-      )}
     </div>
   );
 }
