@@ -235,8 +235,10 @@ export const loginUser = async (username, password) => {
     const data = await handleResponse(response);
     console.log("API Login Response Raw:", data); // Debug log để xem cấu trúc thật
 
-    // API có thể trả về { user } hoặc chính user. Chuẩn hóa sang { user } với snake_case + role/store
-    const apiUser = data?.user ?? data;
+    // API có thể trả về { data: { user } }, { user }, hoặc chính user. Chuẩn hóa!
+    const responseData = data?.data ?? data;
+    const apiUser = responseData?.user ?? responseData;
+
     if (apiUser && (apiUser.userId != null || apiUser.user_id != null)) {
       const uid = apiUser.userId ?? apiUser.user_id;
       
@@ -249,9 +251,14 @@ export const loginUser = async (username, password) => {
         rawRoleId = apiUser.role;
       }
 
-      // Fallback 2: Nếu không có ID, thử map từ tên Role (VD: "Admin" -> 1)
-      if (!rawRoleId && rawRoleName && ROLE_NAME_TO_ID[rawRoleName]) {
-        rawRoleId = ROLE_NAME_TO_ID[rawRoleName];
+      // Fallback 2: Nếu không có ID, thử map từ tên Role (VD: "admin" -> 1), không phân biệt hoa thường
+      if (!rawRoleId && rawRoleName) {
+        const normalizedRoleName = Object.keys(ROLE_NAME_TO_ID).find(
+          key => key.toLowerCase() === rawRoleName.toLowerCase().trim()
+        );
+        if (normalizedRoleName) {
+          rawRoleId = ROLE_NAME_TO_ID[normalizedRoleName];
+        }
       }
 
       const role = apiUser.role
@@ -277,6 +284,7 @@ export const loginUser = async (username, password) => {
         store,
         token: data?.token,
       };
+      console.log("Mapped User for Context:", mappedUser); // Final check before returning
       return { user: mappedUser, token: data?.token };
     }
     return data;
