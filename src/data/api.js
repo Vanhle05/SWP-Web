@@ -300,10 +300,27 @@ export const loginUser = async (username, password) => {
       // --- BƯỚC 3: MAP ROLE NAME SANG ID ---
       if (!rawRoleId && rawRoleName) {
         const cleanName = String(rawRoleName).trim().toLowerCase();
-        // Tìm trong map (case-insensitive)
-        const mappedKey = Object.keys(ROLE_NAME_TO_ID).find(k => k.toLowerCase() === cleanName);
+        
+        // 1. Thử tìm kiếm chính xác trước (an toàn nhất)
+        const mappedKey = Object.keys(ROLE_NAME_TO_ID).find(k => k === cleanName);
         if (mappedKey) {
           rawRoleId = ROLE_NAME_TO_ID[mappedKey];
+        } else {
+          // 2. Nếu không khớp, thử tìm kiếm "mờ" theo từ khóa (linh hoạt hơn)
+          console.warn(`[Login Fix] Role name '${cleanName}' không khớp chính xác. Đang thử tìm kiếm mờ...`);
+          if (cleanName.includes('kitchen')) {
+            rawRoleId = ROLE_ID.KITCHEN_MANAGER;
+          } else if (cleanName.includes('coord')) {
+            rawRoleId = ROLE_ID.SUPPLY_COORDINATOR;
+          } else if (cleanName.includes('store')) {
+            rawRoleId = ROLE_ID.STORE_STAFF;
+          } else if (cleanName.includes('ship')) {
+            rawRoleId = ROLE_ID.SHIPPER;
+          } else if (cleanName.includes('admin')) {
+            rawRoleId = ROLE_ID.ADMIN;
+          } else if (cleanName.includes('manager')) { // Để cuối cùng vì nó chung chung
+            rawRoleId = ROLE_ID.MANAGER;
+          }
         }
       }
       

@@ -38,7 +38,9 @@ export default function Login() {
         console.log("Login Success. RoleID:", roleId, "Redirect Path:", path);
 
         if (path === '/login' || path === '/') {
-          toast.error(`Tài khoản không có quyền truy cập (Role ID: ${roleId || 'N/A'}). Vui lòng liên hệ Admin.`);
+          // Lấy tên role bị lỗi từ object user để hiển thị
+          const failedRoleName = userData.user?.role?.role_name;
+          toast.error(`Lỗi quyền: Không thể xác định vai trò từ tên '${failedRoleName || 'TRỐNG'}' mà API trả về.`);
           return;
         }
 
