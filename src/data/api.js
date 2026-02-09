@@ -233,6 +233,7 @@ export const loginUser = async (username, password) => {
       throw new Error(LOGIN_ERROR_MSG);
     }
     const data = await handleResponse(response);
+    console.log("API Login Response Raw:", data); // Debug log để xem cấu trúc thật
 
     // API có thể trả về { user } hoặc chính user. Chuẩn hóa sang { user } với snake_case + role/store
     const apiUser = data?.user ?? data;
@@ -240,12 +241,23 @@ export const loginUser = async (username, password) => {
       const uid = apiUser.userId ?? apiUser.user_id;
       
       // Fix: Ưu tiên lấy roleId từ object role, nếu không có thì lấy trực tiếp từ user
-      const rawRoleId = apiUser.role?.roleId ?? apiUser.role?.role_id ?? apiUser.roleId ?? apiUser.role_id;
+      let rawRoleId = apiUser.role?.roleId ?? apiUser.role?.role_id ?? apiUser.roleId ?? apiUser.role_id;
       const rawRoleName = apiUser.role?.roleName ?? apiUser.role?.role_name ?? apiUser.roleName;
 
+      // Fallback 1: Nếu role là số (VD: user.role = 1)
+      if (typeof apiUser.role === 'number') {
+        rawRoleId = apiUser.role;
+      }
+
+      // Fallback 2: Nếu không có ID, thử map từ tên Role (VD: "Admin" -> 1)
+      if (!rawRoleId && rawRoleName && ROLE_NAME_TO_ID[rawRoleName]) {
+        rawRoleId = ROLE_NAME_TO_ID[rawRoleName];
+      }
+
       const role = apiUser.role
-        ? { role_id: rawRoleId, role_name: rawRoleName }
-        : (rawRoleId ? { role_id: rawRoleId, role_name: rawRoleName } : null);
+        && typeof apiUser.role === 'object' 
+          ? { role_id: rawRoleId, role_name: rawRoleName }
+          : (rawRoleId ? { role_id: rawRoleId, role_name: rawRoleName || 'Unknown' } : null);
 
       const store = apiUser.store
         ? {

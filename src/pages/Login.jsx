@@ -30,10 +30,19 @@ export default function Login() {
 
       if (userData && userData.user) {
         login(userData);
-        toast.success('Đăng nhập thành công!');
         
         // Truyền trực tiếp role_id vào getRolePath vì state user trong context chưa kịp cập nhật
-        const path = getRolePath(userData.user.role_id);
+        const roleId = userData.user.role_id;
+        const path = getRolePath(roleId);
+        
+        console.log("Login Success. RoleID:", roleId, "Redirect Path:", path);
+
+        if (path === '/login' || path === '/') {
+          toast.error(`Tài khoản không có quyền truy cập hợp lệ (Role ID: ${roleId || 'N/A'}).`);
+          return;
+        }
+
+        toast.success('Đăng nhập thành công!');
         navigate(path, { replace: true });
       } else {
         toast.error('Tên đăng nhập hoặc mật khẩu không đúng.');
