@@ -244,27 +244,51 @@ export const loginUser = async (username, password) => {
       
       // Fix: Ưu tiên lấy roleId từ object role, nếu không có thì lấy trực tiếp từ user
       let rawRoleId = apiUser.role?.roleId ?? apiUser.role?.role_id ?? apiUser.roleId ?? apiUser.role_id;
-      const rawRoleName = apiUser.role?.roleName ?? apiUser.role?.role_name ?? apiUser.roleName;
+      let rawRoleName = apiUser.role?.roleName ?? apiUser.role?.role_name ?? apiUser.roleName;
 
-      // Fallback 1: Nếu role là số (VD: user.role = 1)
-      if (typeof apiUser.role === 'number') {
-        rawRoleId = apiUser.role;
-      }
-
-      // Fallback 2: Nếu không có ID, thử map từ tên Role (VD: "admin" -> 1), không phân biệt hoa thường
-      if (!rawRoleId && rawRoleName) {
-        const normalizedRoleName = Object.keys(ROLE_NAME_TO_ID).find(
-          key => key.toLowerCase() === rawRoleName.toLowerCase().trim()
-        );
-        if (normalizedRoleName) {
-          rawRoleId = ROLE_NAME_TO_ID[normalizedRoleName];
+      // Fallback 1: Nếu role là primitive (số hoặc chuỗi)
+      if (apiUser.role) {
+        if (typeof apiUser.role === 'number') {
+          rawRoleId = apiUser.role;
+        } else if (typeof apiUser.role === 'string') {
+          rawRoleName = apiUser.role;
         }
       }
 
-      const role = apiUser.role
-        && typeof apiUser.role === 'object' 
-          ? { role_id: rawRoleId, role_name: rawRoleName }
-          : (rawRoleId ? { role_id: rawRoleId, role_name: rawRoleName || 'Unknown' } : null);
+      // Fallback 2: Nếu role nằm trong mảng roles (Spring Security thường trả về mảng)
+      if (!rawRoleId && !rawRoleName && Array.isArray(apiUser.roles) && apiUser.roles.length > 0) {
+        const firstRole = apiUser.roles[0];
+        if (typeof firstRole === 'string') rawRoleName = firstRole;
+        else if (typeof firstRole === 'object') {
+          rawRoleId = firstRole.id ?? firstRole.roleId;
+          rawRoleName = firstRole.name ?? firstRole.roleName;
+        }
+      }
+
+      // Fallback 3: Map từ tên Role (xử lý cả "ROLE_ADMIN", "Admin", "kitchen manager"...)
+      if (!rawRoleId && rawRoleName) {
+        const cleanName = String(rawRoleName).replace(/^ROLE_/i, '').trim();
+        
+        // Tìm chính xác (không phân biệt hoa thường)
+        const normalizedRoleName = Object.keys(ROLE_NAME_TO_ID).find(
+          key => key.toLowerCase() === cleanName.toLowerCase()
+        );
+        
+        if (normalizedRoleName) {
+          rawRoleId = ROLE_NAME_TO_ID[normalizedRoleName];
+        } else {
+          // Tìm theo từ khóa (Fuzzy match) - Phòng trường hợp tên không khớp 100%
+          const lowerName = cleanName.toLowerCase();
+          if (lowerName.includes('admin')) rawRoleId = ROLE_ID.ADMIN;
+          else if (lowerName.includes('kitchen')) rawRoleId = ROLE_ID.KITCHEN_MANAGER;
+          else if (lowerName.includes('store')) rawRoleId = ROLE_ID.STORE_STAFF;
+          else if (lowerName.includes('ship')) rawRoleId = ROLE_ID.SHIPPER;
+          else if (lowerName.includes('coord')) rawRoleId = ROLE_ID.SUPPLY_COORDINATOR;
+          else if (lowerName.includes('manager')) rawRoleId = ROLE_ID.MANAGER;
+        }
+      }
+
+      const role = { role_id: rawRoleId, role_name: rawRoleName || 'Unknown' };
 
       const store = apiUser.store
         ? {

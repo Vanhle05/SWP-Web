@@ -38,7 +38,8 @@ export default function Login() {
         console.log("Login Success. RoleID:", roleId, "Redirect Path:", path);
 
         if (path === '/login' || path === '/') {
-          toast.error(`Tài khoản không có quyền truy cập hợp lệ (Role ID: ${roleId || 'N/A'}).`);
+          const roleName = userData.user.role_name || userData.user.role?.role_name;
+          toast.error(`Lỗi quyền: RoleID=${roleId || 'N/A'}, Name=${roleName || 'N/A'}`);
           return;
         }
 
