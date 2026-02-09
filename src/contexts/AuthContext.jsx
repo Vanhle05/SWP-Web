@@ -147,28 +147,50 @@ export const ProtectedRoute = ({ allowedRoles = [], children }) => {
   const { user, isLoading, getRolePath } = useAuth();
   const location = useLocation();
 
+  // Hàm helper để đọc và xác thực user từ sessionStorage một cách an toàn
+  const getSessionUser = () => {
+    try {
+      const storedUser = sessionStorage.getItem('kitchen_user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        // Kiểm tra các trường quan trọng để đảm bảo user object hợp lệ
+        if (parsedUser && (parsedUser.user_id || parsedUser.userId) && parsedUser.role_id != null) {
+          return parsedUser;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Lỗi khi đọc dữ liệu user từ sessionStorage:", error);
+      // Xóa dữ liệu hỏng để tránh lỗi lặp lại
+      sessionStorage.removeItem('kitchen_user');
+      return null;
+    }
+  };
+
+  // Trong lúc AuthProvider đang kiểm tra (lần đầu tải trang), không render gì cả
   if (isLoading) {
-    return null; // Hoặc return <Loader2 ... /> nếu muốn hiện loading spinner
+    return null;
   }
 
-  // Fix Race Condition: Kiểm tra cả user trong state VÀ sessionStorage
-  // Khi vừa login xong, state có thể chưa kịp update nhưng sessionStorage đã có
-  const effectiveUser = user || JSON.parse(sessionStorage.getItem('kitchen_user'));
+  // Giải quyết Race Condition: user từ state là nguồn chính, nhưng ngay sau khi login,
+  // state chưa kịp cập nhật, nên ta dùng fallback là user từ sessionStorage.
+  const effectiveUser = user || getSessionUser();
 
   if (!effectiveUser) {
-    // Redirect về login, lưu lại trang đang truy cập để redirect lại sau khi login xong (nếu cần)
+    // Nếu không có thông tin user ở cả 2 nơi, chuyển về trang login.
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   const roleId = effectiveUser.role_id != null ? Number(effectiveUser.role_id) : null;
   const isAllowed =
-    !Array.isArray(allowedRoles) ||
     allowedRoles.length === 0 ||
     (roleId != null && allowedRoles.includes(roleId));
 
   if (!isAllowed) {
-    const fallback = getRolePath();
-    return <Navigate to={fallback} replace />;
+    // Nếu user đã login nhưng không có quyền truy cập trang này,
+    // đưa họ về trang chính của vai trò của họ.
+    const fallbackPath = getRolePath(roleId);
+    return <Navigate to={fallbackPath} replace />;
   }
 
   return children;
