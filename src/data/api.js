@@ -243,8 +243,9 @@ export const loginUser = async (username, password) => {
       const uid = apiUser.userId ?? apiUser.user_id;
       
       // Fix: Ưu tiên lấy roleId từ object role, nếu không có thì lấy trực tiếp từ user
-      let rawRoleId = apiUser.role?.roleId ?? apiUser.role?.role_id ?? apiUser.roleId ?? apiUser.role_id;
-      let rawRoleName = apiUser.role?.roleName ?? apiUser.role?.role_name ?? apiUser.roleName;
+      // Thêm check apiUser.role.id và apiUser.role.name (trường hợp phổ biến)
+      let rawRoleId = apiUser.role?.roleId ?? apiUser.role?.role_id ?? apiUser.role?.id ?? apiUser.roleId ?? apiUser.role_id;
+      let rawRoleName = apiUser.role?.roleName ?? apiUser.role?.role_name ?? apiUser.role?.name ?? apiUser.roleName;
 
       // Fallback 1: Nếu role là primitive (số hoặc chuỗi)
       if (apiUser.role) {
@@ -255,13 +256,15 @@ export const loginUser = async (username, password) => {
         }
       }
 
-      // Fallback 2: Nếu role nằm trong mảng roles (Spring Security thường trả về mảng)
-      if (!rawRoleId && !rawRoleName && Array.isArray(apiUser.roles) && apiUser.roles.length > 0) {
-        const firstRole = apiUser.roles[0];
+      // Fallback 2: Nếu role nằm trong mảng roles hoặc authorities (Spring Security)
+      const rolesList = apiUser.roles || apiUser.authorities;
+      if (!rawRoleId && !rawRoleName && Array.isArray(rolesList) && rolesList.length > 0) {
+        const firstRole = rolesList[0];
         if (typeof firstRole === 'string') rawRoleName = firstRole;
         else if (typeof firstRole === 'object') {
           rawRoleId = firstRole.id ?? firstRole.roleId;
-          rawRoleName = firstRole.name ?? firstRole.roleName;
+          // Check thêm authority cho Spring Security
+          rawRoleName = firstRole.name ?? firstRole.roleName ?? firstRole.authority;
         }
       }
 
@@ -307,6 +310,9 @@ export const loginUser = async (username, password) => {
         role,
         store,
         token: data?.token,
+        // Debug info: Lưu lại các keys của object gốc để hiển thị nếu lỗi
+        _debug_keys: Object.keys(apiUser),
+        _debug_role_raw: apiUser.role || apiUser.roles || apiUser.authorities
       };
       console.log("Mapped User for Context:", mappedUser); // Final check before returning
       return { user: mappedUser, token: data?.token };

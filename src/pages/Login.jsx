@@ -38,8 +38,11 @@ export default function Login() {
         console.log("Login Success. RoleID:", roleId, "Redirect Path:", path);
 
         if (path === '/login' || path === '/') {
-          const roleName = userData.user.role_name || userData.user.role?.role_name;
-          toast.error(`Lỗi quyền: RoleID=${roleId || 'N/A'}, Name=${roleName || 'N/A'}`);
+          // Hiển thị thông tin debug chi tiết để biết API trả về cái gì
+          const debugKeys = userData.user._debug_keys ? userData.user._debug_keys.join(', ') : 'Unknown';
+          const rawRole = JSON.stringify(userData.user._debug_role_raw || 'N/A').substring(0, 50);
+          
+          toast.error(`Lỗi quyền. Keys: [${debugKeys}]. RoleRaw: ${rawRole}`);
           return;
         }
 
