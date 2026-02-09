@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { loginUser } from '../data/api';
@@ -17,6 +18,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +31,6 @@ export default function Login() {
       if (userData && userData.user) {
         login(userData);
         toast.success('Đăng nhập thành công!');
-        // Tính path trực tiếp từ userData (không dùng getRolePath vì context chưa cập nhật)
         const roleHome = {
           1: '/admin',
           2: '/manager',
@@ -39,8 +40,8 @@ export default function Login() {
           6: '/shipper',
         };
         const path = roleHome[userData.user.role_id] || '/store';
-        // Full reload để AuthProvider đọc sessionStorage và render đúng trang
-        window.location.replace(path);
+        // Dùng navigate thay vì window.location - user đã có trong context từ login()
+        navigate(path, { replace: true });
       } else {
         toast.error('Tên đăng nhập hoặc mật khẩu không đúng.');
       }

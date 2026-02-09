@@ -138,13 +138,7 @@ export const AuthProvider = ({ children }) => {
     );
   }
 
-  // --- CHỐT CHẶN CUỐI CÙNG (Render Guard) ---
-  // Nếu chưa đăng nhập và đang cố vào trang nội bộ -> Trả về null ngay lập tức.
-  // Điều này đảm bảo {children} (trang Admin) KHÔNG BAO GIỜ được render dù chỉ 1 mili-giây.
-  if (!user && !isPublicPage) {
-    return null; // Hoặc return <Loader2 ... /> nếu muốn giữ màn hình chờ
-  }
-
+  // Luôn render children để Login có thể navigate - MainLayout sẽ redirect nếu !user
   return (
     <AuthContext.Provider value={value}>
       {children}
