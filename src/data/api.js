@@ -5,50 +5,6 @@
 const API_BASE_URL = '/api';
 import { ROLE_ID } from './constants';
 
-// --- MOCK DATA CONFIGURATION ---
-// Đổi thành false khi muốn kết nối API thật
-const USE_MOCK_DATA = false;
-
-const MOCK_DB = {
-  users: [
-    { userId: 1, username: 'admin', password: '123', roleId: 1, fullName: 'Administrator', roleName: 'Admin' },
-    { userId: 2, username: 'manager', password: '123', roleId: 2, fullName: 'General Manager', roleName: 'Manager' },
-    { userId: 3, username: 'store', password: '123', roleId: 3, fullName: 'Store Staff A', roleName: 'Store Staff', storeId: 101, storeName: 'Store Quận 1' },
-    { userId: 4, username: 'kitchen', password: '123', roleId: 4, fullName: 'Head Chef', roleName: 'Kitchen Manager' },
-    { userId: 5, username: 'coord', password: '123', roleId: 5, fullName: 'Logistics Coord', roleName: 'Supply Coordinator' },
-    { userId: 6, username: 'shipper', password: '123', roleId: 6, fullName: 'Nguyen Van Ship', roleName: 'Shipper' },
-  ],
-  inventories: [
-    { inventoryId: 1, productId: 101, productName: 'Thịt bò Úc', batch: 'B231001', quantity: 50, expiryDate: '2023-10-01' }, // Hết hạn
-    { inventoryId: 2, productId: 102, productName: 'Cà chua', batch: 'B231025', quantity: 120, expiryDate: new Date(Date.now() + 86400000 * 2).toISOString() }, // Sắp hết hạn (2 ngày nữa)
-    { inventoryId: 3, productId: 103, productName: 'Bột mì', batch: 'B231101', quantity: 500, expiryDate: new Date(Date.now() + 86400000 * 30).toISOString() }, // Còn hạn
-    { inventoryId: 4, productId: 101, productName: 'Thịt bò Úc', batch: 'B231105', quantity: 200, expiryDate: new Date(Date.now() + 86400000 * 15).toISOString() },
-  ],
-  orders: [
-    {
-      orderId: 999, storeId: 101, storeName: 'Store Quận 1', orderDate: new Date().toISOString(), status: 'DONE',
-      orderDetails: [{ productName: 'Pizza Bò', quantity: 2 }, { productName: 'Coke', quantity: 5 }]
-    }
-  ],
-  feedbacks: [],
-  products: [
-    { productId: 201, productName: 'Thịt Heo', productType: 'RAW_MATERIAL', unit: 'kg' },
-    { productId: 202, productName: 'Bột Gạo', productType: 'RAW_MATERIAL', unit: 'kg' },
-    { productId: 101, productName: 'Thịt bò Úc', productType: 'RAW_MATERIAL', unit: 'kg' },
-    { productId: 102, productName: 'Cà chua', productType: 'RAW_MATERIAL', unit: 'kg' },
-    { productId: 103, productName: 'Bột mì', productType: 'RAW_MATERIAL', unit: 'kg' },
-    { productId: 301, productName: 'Pizza Bò', productType: 'FINISHED_PRODUCT', unit: 'cái' },
-  ],
-  log_batches: [
-    { batchId: 'B231001', type: 'PRODUCTION', productId: 101, status: 'DONE', expiryDate: '2023-10-01' },
-    { batchId: 'B231025', type: 'PRODUCTION', productId: 102, status: 'DONE', expiryDate: new Date(Date.now() + 86400000 * 2).toISOString() },
-  ]
-};
-
-// Helper delay để giả lập mạng chậm
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-// -------------------------------
-
 async function handleResponse(response) {
   if (!response.ok) {
     let errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
@@ -100,8 +56,8 @@ function mapOrderDetail(od) {
   return {
     order_detail_id: od.orderDetailId,
     order_id: od.orderId,
-    product_id: od.productId,
-    product_name: od.productName,
+    product_id: od.productId ?? od.product?.productId,
+    product_name: od.productName ?? od.product?.productName,
     quantity: od.quantity,
   };
 }
@@ -111,8 +67,8 @@ function mapOrder(o) {
   return {
     order_id: o.orderId,
     delivery_id: o.deliveryId,
-    store_id: o.storeId,
-    store_name: o.storeName,
+    store_id: o.storeId ?? o.store?.storeId,
+    store_name: o.storeName ?? o.store?.storeName,
     order_date: o.orderDate,
     status: o.status,
     img: o.img,
@@ -130,8 +86,8 @@ function mapDelivery(d) {
     delivery_id: d.deliveryId,
     delivery_date: d.deliveryDate,
     created_at: d.createdAt,
-    shipper_id: d.shipperId,
-    shipper_name: d.shipperName,
+    shipper_id: d.shipperId ?? d.shipper?.userId,
+    shipper_name: d.shipperName ?? d.shipper?.fullName,
     orders: Array.isArray(d.orders) ? d.orders.map(mapOrder) : [],
   };
 }
@@ -140,11 +96,11 @@ function mapInventory(inv) {
   if (!inv) return null;
   return {
     inventory_id: inv.inventoryId,
-    product_id: inv.productId ?? inv.product_id,
-    product_name: inv.product_name,
+    product_id: inv.productId ?? inv.product?.productId ?? inv.product?.product_id,
+    product_name: inv.productName ?? inv.product?.productName ?? inv.product?.product_name,
     batch: inv.batch,
     quantity: inv.quantity,
-    expiry_date: inv.expiryDate,
+    expiry_date: inv.expiryDate ?? inv.expiry_date,
   };
 }
 
@@ -159,15 +115,23 @@ const ROLE_NAME_TO_ID = {
 
 function mapUserResponse(u) {
   if (!u) return null;
-  const roleId = u.roleId ?? (u.roleName && ROLE_NAME_TO_ID[u.roleName]);
+  
+  let roleId = u.roleId ?? u.role?.roleId;
+  const roleName = u.roleName ?? u.role?.roleName;
+  
+  if (!roleId && roleName) {
+    const key = Object.keys(ROLE_NAME_TO_ID).find(k => k.toLowerCase() === roleName.toLowerCase());
+    if (key) roleId = ROLE_NAME_TO_ID[key];
+  }
+
   return {
     user_id: u.userId,
     username: u.username,
     full_name: u.fullName,
-    role_name: u.roleName,
+    role_name: roleName,
     role_id: roleId,
-    store_id: u.storeId,
-    store_name: u.storeName,
+    store_id: u.storeId ?? u.store?.storeId,
+    store_name: u.storeName ?? u.store?.storeName,
   };
 }
 
@@ -213,29 +177,6 @@ const parseJwt = (token) => {
 };
 
 export const loginUser = async (username, password) => {
-  if (USE_MOCK_DATA) {
-    await delay(800); // Giả lập loading
-    const user = MOCK_DB.users.find(u => u.username === username && u.password === password);
-    
-    if (!user) {
-      throw new Error(LOGIN_ERROR_MSG);
-    }
-
-    // Map dữ liệu mock sang cấu trúc App cần
-    const mappedUser = {
-      user_id: user.userId,
-      username: user.username,
-      full_name: user.fullName,
-      role_id: user.roleId,
-      store_id: user.storeId || null,
-      role: { role_id: user.roleId, role_name: user.roleName },
-      store: user.storeId ? { store_id: user.storeId, store_name: user.storeName } : null,
-      token: 'mock-jwt-token-123456',
-    };
-
-    return { user: mappedUser, token: mappedUser.token };
-  }
-
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
@@ -358,10 +299,6 @@ export const loginUser = async (username, password) => {
 // --- Orders API (trả về snake_case) ---
 
 export const fetchOrders = async () => {
-  if (USE_MOCK_DATA) {
-    await delay(500);
-    return MOCK_DB.orders.map(mapOrder); // Lưu ý: mapOrder cần input camelCase nếu mock data viết camelCase
-  }
   const data = await handleResponse(await fetch(`${API_BASE_URL}/orders`));
   return Array.isArray(data) ? data.map(mapOrder) : data;
 };
@@ -399,10 +336,6 @@ export const updateOrderStatus = async (orderId, status) => {
 };
 
 export const getOrdersByStore = async (storeId) => {
-  if (USE_MOCK_DATA) {
-    await delay(500);
-    return MOCK_DB.orders.filter(o => o.storeId === storeId).map(mapOrder);
-  }
   const data = await handleResponse(await fetch(`${API_BASE_URL}/orders/get-by-store/${storeId}`));
   return Array.isArray(data) ? data.map(mapOrder) : data;
 };
@@ -410,10 +343,6 @@ export const getOrdersByStore = async (storeId) => {
 // --- Product API (trả về snake_case) ---
 
 export const getProducts = async () => {
-  if (USE_MOCK_DATA) {
-    await delay(300);
-    return MOCK_DB.products.map(mapProduct);
-  }
   const data = await handleResponse(await fetch(`${API_BASE_URL}/products`));
   return Array.isArray(data) ? data.map(mapProduct) : data;
 };
@@ -578,17 +507,6 @@ export const getTransactionsByBatchId = async (batchId) => {
 // --- Inventories API (trả về snake_case, InventoryResponse có product_name) ---
 
 export const getInventories = async () => {
-  if (USE_MOCK_DATA) {
-    await delay(600);
-    // Mock data đã viết sẵn cấu trúc gần giống output, nhưng để nhất quán ta map lại
-    return MOCK_DB.inventories.map(inv => ({
-      inventory_id: inv.inventoryId,
-      product_name: inv.productName,
-      batch: inv.batch,
-      quantity: inv.quantity,
-      expiry_date: inv.expiryDate
-    }));
-  }
   const data = await handleResponse(await fetch(`${API_BASE_URL}/inventories`));
   return Array.isArray(data) ? data.map(mapInventory) : data;
 };
@@ -628,10 +546,6 @@ export const getProductionPlans = async () => {
 // --- Quality Feedback API (trả về snake_case) ---
 
 export const getAllFeedbacks = async () => {
-  if (USE_MOCK_DATA) {
-    await delay(500);
-    return MOCK_DB.feedbacks.map(mapFeedback);
-  }
   const data = await handleResponse(await fetch(`${API_BASE_URL}/feedbacks`));
   return Array.isArray(data) ? data.map(mapFeedback) : data;
 };
