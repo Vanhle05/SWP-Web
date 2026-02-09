@@ -37,6 +37,7 @@ import Waste from "./pages/kitchen/Waste";
 
 // Shipper pages
 import MyTrips from "./pages/shipper/MyTrips";
+import DeliveryMap from "./pages/shipper/DeliveryMap";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -105,7 +106,7 @@ const App = () => (
                 {/* Shipper routes */}
                 <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.SHIPPER]}><Outlet /></ProtectedRoute>}>
                   <Route path="/shipper" element={<MyTrips />} />
-                  <Route path="/shipper/map" element={<ComingSoon title="Bản đồ giao hàng" />} />
+                  <Route path="/shipper/map" element={<DeliveryMap />} />
                 </Route>
 
                 {/* Admin routes */}

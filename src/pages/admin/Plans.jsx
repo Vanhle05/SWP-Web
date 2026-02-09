@@ -1,11 +1,16 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, AlertTriangle } from 'lucide-react';
 
 export default function Plans() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Kế hoạch Sản xuất</h1>
+
+      <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-md flex items-center gap-2">
+        <AlertTriangle className="h-5 w-5" />
+        <span>Chức năng này đang chờ Backend bổ sung API (Production Plans). Vui lòng quay lại sau.</span>
+      </div>
       
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Loader2, ShoppingCart, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, ShoppingCart, Calendar as CalendarIcon, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Procurement() {
@@ -82,6 +82,10 @@ export default function Procurement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-md flex items-center gap-2 mb-4">
+            <AlertTriangle className="h-5 w-5" />
+            <span>Chức năng này đang chờ Backend bổ sung API (Log Batches).</span>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Chọn Nguyên liệu</Label>
@@ -118,7 +122,7 @@ export default function Procurement() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" disabled={true}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Xác nhận Nhập kho'}
             </Button>
           </form>

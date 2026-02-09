@@ -41,9 +41,9 @@ export default function Waste() {
       // Gọi API tạo transaction EXPORT để trừ kho
       await createTransaction({
         productId: item.product_id,
-        batchId: typeof item.batch === 'object' ? item.batch.batchId : item.batch, // Xử lý tùy theo API trả về object hay string
+        batchId: item.batch_id || (typeof item.batch === 'object' ? item.batch.batchId : item.batch),
         type: 'EXPORT',
-        quantity: item.quantity,
+        quantity: Number(item.quantity),
         note: 'Tiêu hủy hàng hết hạn (Waste Disposal)'
       });
       

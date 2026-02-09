@@ -99,6 +99,7 @@ function mapInventory(inv) {
     product_id: inv.productId ?? inv.product?.productId ?? inv.product?.product_id,
     product_name: inv.productName ?? inv.product?.productName ?? inv.product?.product_name,
     batch: inv.batch,
+    batch_id: inv.batch?.batchId ?? inv.batchId, // Lấy ID số của lô để dùng cho transaction
     quantity: inv.quantity,
     expiry_date: inv.expiryDate ?? inv.expiry_date,
   };
@@ -324,7 +325,8 @@ export const updateOrderStatus = async (orderId, status) => {
   // Swagger: PATCH /orders/update-status?orderId=...&status=...
   const params = new URLSearchParams();
   params.append('orderId', orderId);
-  params.append('status', status);
+  // Fix: Backend quy định enum là "CANCLED" (thiếu chữ L), cần map đúng để không bị lỗi 400
+  params.append('status', status === 'CANCELLED' ? 'CANCLED' : status);
 
   const response = await fetch(`${API_BASE_URL}/orders/update-status?${params.toString()}`, {
     method: 'PATCH',
@@ -469,13 +471,9 @@ export const assignShipperToDelivery = async (deliveryId, shipperId) => {
 };
 
 export const createDelivery = async (deliveryData) => {
-  // Lưu ý: OpenAPI spec không có POST /deliveries; giữ lại nếu backend hỗ trợ.
-  const response = await fetch(`${API_BASE_URL}/deliveries`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(deliveryData),
-  });
-  return await handleResponse(response);
+  // OpenAPI Spec hiện tại KHÔNG có endpoint POST /deliveries.
+  // Để tránh lỗi 405 Method Not Allowed, ta chặn ngay tại đây.
+  throw new Error("Chức năng tạo chuyến xe chưa được Backend hỗ trợ (Missing POST /deliveries).");
 };
 
 // --- Inventory Transactions API ---
@@ -519,28 +517,20 @@ export const getInventoryById = async (inventoryId) => {
 // --- Log Batches API (cho Flow 3: Procurement) ---
 
 export const createPurchaseBatch = async (batchData) => {
-  const response = await fetch(`${API_BASE_URL}/log-batches`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(batchData),
-  });
-  return await handleResponse(response);
+  // OpenAPI Spec không có endpoint /log-batches
+  throw new Error("Chức năng nhập lô hàng chưa được Backend hỗ trợ (Missing API).");
 };
 
 // API tạo lô sản xuất (Production Batch)
 export const createBatch = async (batchData) => {
-  const response = await fetch(`${API_BASE_URL}/log-batches`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(batchData),
-  });
-  return await handleResponse(response);
+  // OpenAPI Spec không có endpoint /log-batches
+  throw new Error("Chức năng tạo lô sản xuất chưa được Backend hỗ trợ (Missing API).");
 };
 
 // API lấy kế hoạch sản xuất
 export const getProductionPlans = async () => {
-  const response = await fetch(`${API_BASE_URL}/production-plans`);
-  return await handleResponse(response);
+  // OpenAPI Spec không có endpoint /production-plans
+  throw new Error("Chức năng kế hoạch sản xuất chưa được Backend hỗ trợ (Missing API).");
 };
 
 // --- Quality Feedback API (trả về snake_case) ---
