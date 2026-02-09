@@ -30,10 +30,12 @@ import ProductionPlanning from "./pages/manager/ProductionPlanning";
 // Kitchen pages
 import KitchenDashboard from "./pages/kitchen/Dashboard";
 import Production from "./pages/kitchen/Production";
-import Inventory from "./pages/warehouse/Inventory";
-import Outbound from "./pages/warehouse/Outbound";
-import Procurement from "./pages/warehouse/Procurement";
-import Waste from "./pages/warehouse/Waste";
+import Inventory from "./pages/kitchen/Inventory";
+import Outbound from "./pages/kitchen/Outbound";
+import Procurement from "./pages/kitchen/Procurement";
+import Waste from "./pages/kitchen/Waste";
+import StockCard from "./pages/kitchen/StockCard";
+import RecipeViewer from "./pages/kitchen/RecipeViewer";
 
 // Shipper pages
 import MyTrips from "./pages/shipper/MyTrips";
@@ -100,6 +102,12 @@ const App = () => (
                 <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.KITCHEN_MANAGER]}><Outlet /></ProtectedRoute>}>
                   <Route path="/kitchen" element={<KitchenDashboard />} />
                   <Route path="/kitchen/production" element={<Production />} />
+                  <Route path="/kitchen/inventory" element={<Inventory />} />
+                  <Route path="/kitchen/outbound" element={<Outbound />} />
+                  <Route path="/kitchen/procurement" element={<Procurement />} />
+                  <Route path="/kitchen/waste" element={<Waste />} />
+                  <Route path="/kitchen/stock-card" element={<StockCard />} />
+                  <Route path="/kitchen/recipes" element={<RecipeViewer />} />
                 </Route>
 
                 {/* Shipper routes */}
