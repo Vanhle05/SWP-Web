@@ -69,3 +69,26 @@ Manager: Thực hiện thao tác "Hủy hàng" trên App.
 - B3: Ghi nhận & Báo cáo
 System: Tạo inventory_transactions với type = EXPORT (Xuất hủy) để đưa tồn kho về 0.
 System: Tạo bản ghi vào bảng reports với report_type = 'WASTE' để cuối tháng tính toán chi phí lỗ vốn do hư hỏng.
+
+Flow 5: Quy trình Quản trị Hệ thống (Admin/Manager Flow)
+- B1: Quản lý Người dùng & Cửa hàng
+	- Admin: Đăng nhập vào Web Admin.
+	- Admin: Tạo tài khoản cho nhân viên mới (Store Staff, Kitchen, Shipper...).
+	- Admin: Nếu tạo Store Staff, hệ thống bắt buộc Admin phải chọn một Store cụ thể từ danh sách (BR-003). Nếu không chọn, không cho tạo User.
+	- Admin: Tạo/Sửa thông tin các Cửa hàng (Stores) trong chuỗi.
+- B2: Xem Báo cáo
+	- Manager/Admin: Xem Dashboard tổng hợp doanh thu, hàng tồn kho, và báo cáo hủy hàng (Waste Report).
+
+Flow 6: Quy trình Quản lý Master Data (Product & Recipe)
+- B1: Định nghĩa Sản phẩm
+	- Admin: Tạo sản phẩm mới.
+	- Admin: Phân loại (Raw Material, Semi-Finished, Finished Product).
+	- Admin: Thiết lập giá bán và đơn vị tính.
+- B2: Thiết lập Công thức (Recipe)
+	- Admin: Chọn một Finished Product hoặc Semi-Finished Product.
+	- Admin: Thêm các nguyên liệu thành phần (Raw Material) và định lượng.
+	- System: Kiểm tra BR-001 (Bắt buộc có công thức cho thành phẩm) và BR-002 (Nguyên liệu hợp lệ).
+- B3: Lập Kế hoạch Sản xuất (Planning)
+	- Manager: Dựa trên nhu cầu dự báo, vào màn hình Planning.
+	- Manager: Tạo Production Plan cho ngày hôm sau. Manager phải chọn ngày và thêm các món cần nấu.
+	- System: Lưu plan để Kitchen Manager thấy ở Flow 2.

@@ -3,6 +3,7 @@
 // Base URL qua Vercel rewrites: /api -> backend
 
 const API_BASE_URL = '/api';
+import { ROLE_ID } from './constants';
 
 async function handleResponse(response) {
   if (!response.ok) {
@@ -103,7 +104,14 @@ function mapInventory(inv) {
   };
 }
 
-const ROLE_NAME_TO_ID = { Admin: 1, Manager: 2, 'Store Staff': 3, 'Kitchen Manager': 4, 'Supply Coordinator': 5, Shipper: 6 };
+const ROLE_NAME_TO_ID = {
+  Admin: ROLE_ID.ADMIN,
+  Manager: ROLE_ID.MANAGER,
+  'Store Staff': ROLE_ID.STORE_STAFF,
+  'Kitchen Manager': ROLE_ID.KITCHEN_MANAGER,
+  'Supply Coordinator': ROLE_ID.SUPPLY_COORDINATOR,
+  Shipper: ROLE_ID.SHIPPER
+};
 
 function mapUserResponse(u) {
   if (!u) return null;
@@ -163,9 +171,15 @@ export const loginUser = async (username, password) => {
     const apiUser = data?.user ?? data;
     if (apiUser && (apiUser.userId != null || apiUser.user_id != null)) {
       const uid = apiUser.userId ?? apiUser.user_id;
+      
+      // Fix: Ưu tiên lấy roleId từ object role, nếu không có thì lấy trực tiếp từ user
+      const rawRoleId = apiUser.role?.roleId ?? apiUser.role?.role_id ?? apiUser.roleId ?? apiUser.role_id;
+      const rawRoleName = apiUser.role?.roleName ?? apiUser.role?.role_name ?? apiUser.roleName;
+
       const role = apiUser.role
-        ? { role_id: apiUser.role.roleId ?? apiUser.role.role_id, role_name: apiUser.role.roleName ?? apiUser.role.role_name }
-        : null;
+        ? { role_id: rawRoleId, role_name: rawRoleName }
+        : (rawRoleId ? { role_id: rawRoleId, role_name: rawRoleName } : null);
+
       const store = apiUser.store
         ? {
             store_id: apiUser.store.storeId ?? apiUser.store.store_id,
@@ -178,7 +192,7 @@ export const loginUser = async (username, password) => {
         user_id: uid,
         username: apiUser.username,
         full_name: apiUser.fullName ?? apiUser.full_name,
-        role_id: role?.role_id ?? null,
+        role_id: rawRoleId ?? null,
         store_id: store?.store_id ?? null,
         role,
         store,

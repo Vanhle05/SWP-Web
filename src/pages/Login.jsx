@@ -17,7 +17,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login } = useAuth();
+  const { login, getRolePath } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -31,15 +31,10 @@ export default function Login() {
       if (userData && userData.user) {
         login(userData);
         toast.success('Đăng nhập thành công!');
-        const roleHome = {
-          1: '/admin',
-          2: '/manager',
-          3: '/store',
-          4: '/kitchen',
-          5: '/coordinator',
-          6: '/shipper',
-        };
-        const path = roleHome[userData.user.role_id] || '/store';
+        
+        // Fix: Sử dụng logic điều hướng thống nhất từ AuthContext hoặc mapping chính xác
+        // userData.user đã được map qua api.js nên role_id đã chuẩn
+        const path = getRolePath ? getRolePath() : '/store';
         // Dùng navigate thay vì window.location - user đã có trong context từ login()
         navigate(path, { replace: true });
       } else {

@@ -27,3 +27,21 @@ export const PRODUCT_TYPE = {
   SEMI_FINISHED: { label: 'Bán thành phẩm', color: 'orange' },
   FINISHED_PRODUCT: { label: 'Thành phẩm', color: 'green' },
 };
+
+export const ROLE_ID = {
+  ADMIN: 1,
+  MANAGER: 2,
+  STORE_STAFF: 3,
+  KITCHEN_MANAGER: 4,
+  SUPPLY_COORDINATOR: 5,
+  SHIPPER: 6,
+};
+
+export const ROLE_REDIRECT_PATH = {
+  [ROLE_ID.ADMIN]: '/admin',
+  [ROLE_ID.MANAGER]: '/manager',
+  [ROLE_ID.STORE_STAFF]: '/store',
+  [ROLE_ID.KITCHEN_MANAGER]: '/kitchen',
+  [ROLE_ID.SUPPLY_COORDINATOR]: '/coordinator',
+  [ROLE_ID.SHIPPER]: '/shipper',
+};

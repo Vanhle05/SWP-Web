@@ -126,5 +126,28 @@ Tất cả các báo cáo nêu trên.
 Báo cáo tổng hợp tài chính: Doanh thu, Lợi nhuận, Giá vốn.
 Hiệu suất làm việc của tất cả nhân viên (KPIs).
 
+VIII. QUY TẮC BẢO MẬT & HỆ THỐNG (SECURITY & SYSTEM)
+BR-030: Kiểm tra trạng thái hoạt động (Active User Check)
+Mô tả: Khi đăng nhập, hệ thống phải kiểm tra cờ `is_active` của User.
+Validation: Nếu `is_active = false` (đã nghỉ việc hoặc bị khóa), từ chối đăng nhập và thông báo "Tài khoản đã bị khóa".
 
+BR-031: Tính duy nhất của Tên đăng nhập (Unique Username)
+Mô tả: Trong hệ thống, `username` phải là duy nhất, không phân biệt hoa thường.
+Validation: Khi tạo hoặc sửa User, nếu username trùng với user khác -> Báo lỗi.
 
+BR-032: Tính duy nhất của Tên Cửa hàng (Unique Store Name)
+Mô tả: Tên cửa hàng (`store_name`) không được trùng nhau để tránh nhầm lẫn trong vận hành giao vận.
+
+BR-033: Ràng buộc mật khẩu (Password Policy)
+Mô tả: Mật khẩu người dùng phải có độ dài tối thiểu 6 ký tự.
+Validation: API trả về lỗi 400 nếu password quá ngắn.
+
+BR-034: Tính toàn vẹn của Chuyển đổi Trạng thái (Status Transition Integrity)
+Mô tả: Không được phép thay đổi trạng thái đơn hàng/chuyến xe một cách tùy tiện.
+Validation:
+- Order: WAITING -> PROCESSING -> DELIVERING -> DONE/DAMAGED. Không được từ WAITING nhảy thẳng sang DONE.
+- Delivery: WAITING -> PROCESSING -> DONE.
+
+BR-035: Phạm vi dữ liệu theo Role (Role-based Data Scope)
+Mô tả: API phải lọc dữ liệu trả về dựa trên Role của người gọi (Server-side filtering), không chỉ ẩn trên giao diện.
+Validation: Store Staff gọi API /orders chỉ nhận được đơn của store mình, không nhận được đơn của store khác.

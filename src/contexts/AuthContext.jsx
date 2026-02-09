@@ -1,7 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 const AuthContext = createContext(null);
+
+// Định nghĩa đường dẫn mặc định cho từng Role
+const ROLE_PATHS = {
+  1: '/admin',
+  2: '/manager',
+  3: '/store',
+  4: '/kitchen',
+  5: '/coordinator',
+  6: '/shipper',
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -94,29 +105,11 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user]); // Chạy lại khi trạng thái user thay đổi (đăng nhập/đăng xuất)
 
-  // Xác định xem trang hiện tại có phải là trang công khai (Login) không
-  const isPublicPage = window.location.pathname === '/login';
-
-  // --- Bảo vệ Route ngay tại Context (Chặn truy cập trực tiếp qua URL) ---
-  useEffect(() => {
-    // Nếu đã tải xong mà không có user, và đang không ở trang login
-    if (!isLoading && !user && !isPublicPage) {
-      window.location.href = '/login';
-    }
-  }, [isLoading, user, isPublicPage]);
-
-  const getRolePath = () => {
-    if (!user) return '/login';
-    
-    switch (user.role_id) {
-      case 1: return '/admin';
-      case 2: return '/manager'; 
-      case 3: return '/store';
-      case 4: return '/kitchen';
-      case 5: return '/coordinator';
-      case 6: return '/shipper';
-      default: return '/login';
-    }
+  const getRolePath = (roleId) => {
+    // Ưu tiên roleId truyền vào, nếu không có thì lấy từ user hiện tại
+    const id = roleId || user?.role_id;
+    // Ép kiểu về Number để khớp với key trong ROLE_PATHS
+    return ROLE_PATHS[Number(id)] || '/login';
   };
 
   const value = {
@@ -144,4 +137,32 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+// --- Component bảo vệ Route (Được gộp vào đây) ---
+export const ProtectedRoute = ({ allowedRoles = [], children }) => {
+  const { user, isLoading, getRolePath } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return null; // Hoặc return <Loader2 ... /> nếu muốn hiện loading spinner
+  }
+
+  if (!user) {
+    // Redirect về login, lưu lại trang đang truy cập để redirect lại sau khi login xong (nếu cần)
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  const roleId = user.role_id != null ? Number(user.role_id) : null;
+  const isAllowed =
+    !Array.isArray(allowedRoles) ||
+    allowedRoles.length === 0 ||
+    (roleId != null && allowedRoles.includes(roleId));
+
+  if (!isAllowed) {
+    const fallback = getRolePath();
+    return <Navigate to={fallback} replace />;
+  }
+
+  return children;
 };

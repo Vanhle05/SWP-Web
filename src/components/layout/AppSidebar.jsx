@@ -97,7 +97,8 @@ export function AppSidebar() {
 
   if (!user) return null;
 
-  const menuItems = menuByRole[user.role_id] || [];
+  // Fix: Ép kiểu sang Number để đảm bảo khớp với key trong menuByRole
+  const menuItems = menuByRole[Number(user.role_id)] || [];
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">

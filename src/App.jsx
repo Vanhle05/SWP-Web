@@ -2,10 +2,11 @@ import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { AuthProvider, ProtectedRoute } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import { MainLayout } from "./components/layout/MainLayout";
+import { ROLE_ID } from "./data/constants";
 
 // Pages
 import Login from "./pages/Login";
@@ -66,40 +67,52 @@ const App = () => (
               {/* Protected routes */}
               <Route element={<MainLayout />}>
                 {/* Store routes */}
-                <Route path="/store" element={<Marketplace />} />
-                <Route path="/store/cart" element={<Cart />} />
-                <Route path="/store/orders" element={<OrderHistory />} />
-                <Route path="/store/feedback" element={<Feedback />} />
+                <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.STORE_STAFF]}><Outlet /></ProtectedRoute>}>
+                  <Route path="/store" element={<Marketplace />} />
+                  <Route path="/store/cart" element={<Cart />} />
+                  <Route path="/store/orders" element={<OrderHistory />} />
+                  <Route path="/store/feedback" element={<Feedback />} />
+                </Route>
 
                 {/* Coordinator routes */}
-                <Route path="/coordinator" element={<CoordinatorDashboard />} />
-                <Route path="/coordinator/orders" element={<OrderAggregation />} />
-                <Route path="/coordinator/deliveries" element={<Deliveries />} />
+                <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.SUPPLY_COORDINATOR]}><Outlet /></ProtectedRoute>}>
+                  <Route path="/coordinator" element={<CoordinatorDashboard />} />
+                  <Route path="/coordinator/orders" element={<OrderAggregation />} />
+                  <Route path="/coordinator/deliveries" element={<Deliveries />} />
+                </Route>
 
                 {/* Manager routes */}
-                <Route path="/manager" element={<ManagerDashboard />} />
-                <Route path="/manager/planning" element={<ProductionPlanning />} />
+                <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.MANAGER, ROLE_ID.ADMIN]}><Outlet /></ProtectedRoute>}>
+                  <Route path="/manager" element={<ManagerDashboard />} />
+                  <Route path="/manager/planning" element={<ProductionPlanning />} />
+                </Route>
 
                 {/* Kitchen routes */}
-                <Route path="/kitchen" element={<KitchenDashboard />} />
-                <Route path="/kitchen/outbound" element={<ComingSoon title="Xuất kho giao hàng" />} />
-                <Route path="/kitchen/production" element={<Production />} />
-                <Route path="/kitchen/procurement" element={<ComingSoon title="Nhập nguyên liệu" />} />
-                <Route path="/kitchen/waste" element={<ComingSoon title="Quản lý hủy hàng" />} />
-                <Route path="/kitchen/inventory" element={<Inventory />} />
+                <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.KITCHEN_MANAGER]}><Outlet /></ProtectedRoute>}>
+                  <Route path="/kitchen" element={<KitchenDashboard />} />
+                  <Route path="/kitchen/outbound" element={<ComingSoon title="Xuất kho giao hàng" />} />
+                  <Route path="/kitchen/production" element={<Production />} />
+                  <Route path="/kitchen/procurement" element={<ComingSoon title="Nhập nguyên liệu" />} />
+                  <Route path="/kitchen/waste" element={<ComingSoon title="Quản lý hủy hàng" />} />
+                  <Route path="/kitchen/inventory" element={<Inventory />} />
+                </Route>
 
                 {/* Shipper routes */}
-                <Route path="/shipper" element={<MyTrips />} />
-                <Route path="/shipper/map" element={<ComingSoon title="Bản đồ giao hàng" />} />
+                <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.SHIPPER]}><Outlet /></ProtectedRoute>}>
+                  <Route path="/shipper" element={<MyTrips />} />
+                  <Route path="/shipper/map" element={<ComingSoon title="Bản đồ giao hàng" />} />
+                </Route>
 
                 {/* Admin routes */}
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/recipes" element={<ComingSoon title="Quản lý công thức" />} />
-                <Route path="/admin/plans" element={<ComingSoon title="Kế hoạch sản xuất" />} />
-                <Route path="/admin/products" element={<Products />} />
-                <Route path="/admin/users" element={<Users />} />
-                <Route path="/admin/reports" element={<ComingSoon title="Báo cáo" />} />
-                <Route path="/admin/settings" element={<ComingSoon title="Cài đặt" />} />
+                <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.ADMIN, ROLE_ID.MANAGER]}><Outlet /></ProtectedRoute>}>
+                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin/recipes" element={<ComingSoon title="Quản lý công thức" />} />
+                  <Route path="/admin/plans" element={<ComingSoon title="Kế hoạch sản xuất" />} />
+                  <Route path="/admin/products" element={<Products />} />
+                  <Route path="/admin/users" element={<Users />} />
+                  <Route path="/admin/reports" element={<ComingSoon title="Báo cáo" />} />
+                  <Route path="/admin/settings" element={<ComingSoon title="Cài đặt" />} />
+                </Route>
               </Route>
 
               {/* Redirects */}
