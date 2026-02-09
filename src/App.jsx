@@ -42,6 +42,8 @@ import MyTrips from "./pages/shipper/MyTrips";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Products from "./pages/admin/Products";
 import Users from "./pages/admin/Users";
+import Recipes from "./pages/admin/Recipes";
+import Plans from "./pages/admin/Plans";
 
 const queryClient = new QueryClient();
 
@@ -109,8 +111,8 @@ const App = () => (
                 {/* Admin routes */}
                 <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.ADMIN, ROLE_ID.MANAGER]}><Outlet /></ProtectedRoute>}>
                   <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/admin/recipes" element={<ComingSoon title="Quản lý công thức" />} />
-                  <Route path="/admin/plans" element={<ComingSoon title="Kế hoạch sản xuất" />} />
+                  <Route path="/admin/recipes" element={<Recipes />} />
+                  <Route path="/admin/plans" element={<Plans />} />
                   <Route path="/admin/products" element={<Products />} />
                   <Route path="/admin/users" element={<Users />} />
                   <Route path="/admin/reports" element={<ComingSoon title="Báo cáo" />} />

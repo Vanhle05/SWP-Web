@@ -49,7 +49,7 @@ export default function ProductionPlanning() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
-            Chưa có kế hoạch. Backend cần bổ sung API Production Plans để tạo và xem kế hoạch.
+            Chưa có kế hoạch.
           </p>
           {finishedProducts.length > 0 && (
             <p className="text-sm text-muted-foreground">
