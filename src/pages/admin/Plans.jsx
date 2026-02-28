@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { CalendarDays, Loader2, Plus } from 'lucide-react';
@@ -7,13 +9,17 @@ import { getProductionPlans, createProductionPlan } from '../../data/api';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+
+export default function Plans() {
+  const [plans, setPlans] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     planDate: '',
     startDate: '',
     endDate: '',
     note: '',
-    details: [] // [{ productId, quantity, note }]
+    details: []
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -48,10 +54,6 @@ import { toast } from 'sonner';
       setIsSubmitting(false);
     }
   };
-
-export default function Plans() {
-  const [plans, setPlans] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchPlans = async () => {
