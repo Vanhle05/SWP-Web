@@ -535,9 +535,24 @@ export const createBatch = async (batchData) => {
 };
 
 // API lấy kế hoạch sản xuất
+// --- Production Plans API ---
 export const getProductionPlans = async () => {
-  // OpenAPI Spec không có endpoint /production-plans
-  throw new Error("Chức năng kế hoạch sản xuất chưa được Lưu và Đanh hỗ trợ (Missing API).");
+  const response = await fetch(`${API_BASE_URL}/production-plans`);
+  return await handleResponse(response);
+};
+
+export const createProductionPlan = async (planData) => {
+  const response = await fetch(`${API_BASE_URL}/production-plans`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(planData),
+  });
+  return await handleResponse(response);
+};
+
+export const getProductionPlanById = async (id) => {
+  const response = await fetch(`${API_BASE_URL}/production-plans/${id}`);
+  return await handleResponse(response);
 };
 
 // --- Quality Feedback API (trả về snake_case) ---

@@ -9,7 +9,7 @@ export default function Plans() {
 
       <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-md flex items-center gap-2">
         <AlertTriangle className="h-5 w-5" />
-        <span>Chức năng này đang chờ Backend bổ sung API (Production Plans). Vui lòng quay lại sau.</span>
+        <span>Chức năng này đang chờ Lưu và Đanh bổ sung API (Production Plans). Vui lòng quay lại sau.</span>
       </div>
       
       <div className="grid gap-6 md:grid-cols-2">
