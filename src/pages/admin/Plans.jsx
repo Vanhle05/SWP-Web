@@ -1,8 +1,53 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { CalendarDays, Loader2 } from 'lucide-react';
-import { getProductionPlans } from '../../data/api';
+import { CalendarDays, Loader2, Plus } from 'lucide-react';
+import { getProductionPlans, createProductionPlan } from '../../data/api';
+import { Input } from '../../components/ui/input';
+import { Button } from '../../components/ui/button';
+import { toast } from 'sonner';
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    planDate: '',
+    startDate: '',
+    endDate: '',
+    note: '',
+    details: [] // [{ productId, quantity, note }]
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleFormChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.planDate || !formData.startDate || !formData.endDate) {
+      toast.error('Vui lòng nhập đầy đủ thông tin ngày.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await createProductionPlan({
+        planDate: formData.planDate,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        note: formData.note,
+        details: formData.details
+      });
+      toast.success('Tạo kế hoạch sản xuất thành công!');
+      setShowForm(false);
+      setFormData({ planDate: '', startDate: '', endDate: '', note: '', details: [] });
+      // Reload plans
+      const data = await getProductionPlans();
+      setPlans(data?.details ? [data] : Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error('Lỗi tạo kế hoạch: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
 export default function Plans() {
   const [plans, setPlans] = useState([]);
@@ -60,9 +105,36 @@ export default function Plans() {
             Không có kế hoạch sản xuất nào.
           </div>
         )}
-        {/* Placeholder cho form tạo plan */}
-        <div className="flex items-center justify-center border-2 border-dashed rounded-lg h-64 text-muted-foreground">
-          Chọn ngày trên lịch để tạo kế hoạch mới
+        <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg h-64 text-muted-foreground">
+          {!showForm ? (
+            <Button variant="outline" onClick={() => setShowForm(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Tạo kế hoạch mới
+            </Button>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-3 w-full max-w-md">
+              <div>
+                <label className="text-sm font-medium">Ngày kế hoạch</label>
+                <Input type="date" name="planDate" value={formData.planDate} onChange={handleFormChange} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Ngày bắt đầu</label>
+                <Input type="date" name="startDate" value={formData.startDate} onChange={handleFormChange} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Ngày kết thúc</label>
+                <Input type="date" name="endDate" value={formData.endDate} onChange={handleFormChange} required />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Ghi chú</label>
+                <Input type="text" name="note" value={formData.note} onChange={handleFormChange} />
+              </div>
+              {/* Có thể bổ sung thêm phần chọn sản phẩm và số lượng cho details nếu cần */}
+              <Button type="submit" disabled={isSubmitting} className="w-full mt-2">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Tạo kế hoạch'}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setShowForm(false)} className="w-full">Hủy</Button>
+            </form>
+          )}
         </div>
       </div>
     </div>
