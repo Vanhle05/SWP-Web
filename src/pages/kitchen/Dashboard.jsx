@@ -44,6 +44,8 @@ export default function KitchenDashboard() {
   }, []);
 
   const totalInventory = inventories.reduce((sum, inv) => sum + (inv.quantity ?? 0), 0);
+  // Note: activePlans và processingBatches cần API Production Plans/Batches từ backend
+  // Hiện tại để 0, khi backend bổ sung API sẽ thay thế bằng dữ liệu thật
   const activePlans = 0;
   const processingBatches = 0;
   const pendingDeliveries = deliveries.filter((d) => d.status === 'WAITTING').length;

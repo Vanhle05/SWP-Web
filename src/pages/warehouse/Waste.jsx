@@ -93,7 +93,6 @@ export default function Waste() {
                   <Button 
                     variant="destructive" 
                     onClick={() => handleDispose(item)}
-                    disabled={isProcessing}
                   >
                     {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                     Xác nhận Tiêu hủy

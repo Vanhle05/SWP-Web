@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { CalendarDays, Loader2, Plus } from 'lucide-react';
@@ -131,7 +127,7 @@ export default function Plans() {
                 <Input type="text" name="note" value={formData.note} onChange={handleFormChange} />
               </div>
               {/* Có thể bổ sung thêm phần chọn sản phẩm và số lượng cho details nếu cần */}
-              <Button type="submit" disabled={isSubmitting} className="w-full mt-2">
+              <Button type="submit" className="w-full mt-2">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : 'Tạo kế hoạch'}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)} className="w-full">Hủy</Button>

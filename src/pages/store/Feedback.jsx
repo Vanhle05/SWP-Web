@@ -221,7 +221,6 @@ export default function Feedback() {
                   <Button
                     className="flex-1"
                     onClick={handleSubmitFeedback}
-                    disabled={rating === 0 || submitting}
                   >
                     Gửi đánh giá
                   </Button>

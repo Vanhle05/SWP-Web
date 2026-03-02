@@ -148,7 +148,6 @@ export default function OrderAggregation() {
           </Button>
           <Button
             onClick={() => setShowCreateDelivery(true)}
-            disabled={selectedOrders.length === 0}
           >
             <Truck className="h-4 w-4 mr-2" />
             Tạo chuyến ({selectedOrders.length})

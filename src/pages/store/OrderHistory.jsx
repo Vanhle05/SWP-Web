@@ -210,6 +210,7 @@ export default function OrderHistory() {
             <AlertDialogAction
               onClick={handleCancelOrder}
               className="bg-destructive hover:bg-destructive/90"
+              // Xóa disabled, luôn cho thao tác
             >
               Hủy đơn hàng
             </AlertDialogAction>

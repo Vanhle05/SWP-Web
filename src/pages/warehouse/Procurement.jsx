@@ -122,7 +122,7 @@ export default function Procurement() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={true}>
+            <Button type="submit" className="w-full">
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Xác nhận Nhập kho'}
             </Button>
           </form>

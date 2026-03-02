@@ -44,6 +44,8 @@ export default function ManagerDashboard() {
     const expiry = new Date(i.expiry_date || 0);
     return expiry < new Date() && (i.quantity ?? 0) > 0;
   });
+  // Note: pendingImportBatches cần API Production Batches từ backend
+  // Hiện tại để [], khi backend bổ sung API sẽ thay thế bằng dữ liệu thật
   const pendingImportBatches = [];
   const finishedProducts = products.filter((p) => p.product_type === 'FINISHED_PRODUCT');
 

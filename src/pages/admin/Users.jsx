@@ -133,7 +133,7 @@ export default function Users() {
                 </Select>
               )}
 
-              <Button onClick={handleCreate} disabled={isSubmitting} className="w-full">
+              <Button onClick={handleCreate} className="w-full">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : 'Tạo tài khoản'}
               </Button>
             </div>

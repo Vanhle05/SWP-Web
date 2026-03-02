@@ -129,7 +129,6 @@ export default function Outbound() {
               </div>
               <Button 
                 onClick={() => handleDispatch(delivery)} 
-                disabled={processingId === delivery.delivery_id}
                 className="w-full sm:w-auto"
               >
                 {processingId === delivery.delivery_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}

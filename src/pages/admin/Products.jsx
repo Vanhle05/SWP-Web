@@ -92,7 +92,7 @@ export default function Products() {
               <Input type="number" placeholder="Hạn sử dụng (ngày)" value={formData.shelfLifeDays} onChange={e => setFormData({...formData, shelfLifeDays: e.target.value})} />
               <Input type="number" placeholder="Giá bán (VNĐ)" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
 
-              <Button onClick={handleCreate} disabled={isSubmitting} className="w-full">
+              <Button onClick={handleCreate} className="w-full">
                 {isSubmitting ? <Loader2 className="animate-spin" /> : 'Xác nhận'}
               </Button>
             </div>

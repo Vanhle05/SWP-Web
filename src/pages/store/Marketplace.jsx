@@ -136,7 +136,7 @@ export default function Marketplace() {
                     <Plus className="h-3 w-3" />
                   </Button>
                 </div>
-                <Button className="flex-1" onClick={() => handleAddToCart(product)} disabled={available === 0}>
+                <Button className="flex-1" onClick={() => handleAddToCart(product)}>
                   <ShoppingCart className="mr-2 h-4 w-4" /> Thêm
                 </Button>
               </CardFooter>

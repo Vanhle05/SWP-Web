@@ -177,7 +177,7 @@ export default function MyTrips() {
           <Button
             className="w-full"
             onClick={() => handleStartDelivery(delivery)}
-            disabled={isUpdating}
+            // Xóa disabled, luôn cho thao tác
           >
             {isUpdating ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -267,7 +267,7 @@ export default function MyTrips() {
               variant="outline"
               className="h-24 flex-col gap-2 border-success hover:bg-success/10"
               onClick={() => handleCompleteOrder('DONE')}
-              disabled={isUpdating}
+              // Xóa disabled, luôn cho thao tác
             >
               <CheckCircle2 className="h-8 w-8 text-success" />
               <span>Giao thành công</span>
@@ -276,7 +276,7 @@ export default function MyTrips() {
               variant="outline"
               className="h-24 flex-col gap-2 border-destructive hover:bg-destructive/10"
               onClick={() => handleCompleteOrder('DAMAGED')}
-              disabled={isUpdating}
+              // Xóa disabled, luôn cho thao tác
             >
               <AlertTriangle className="h-8 w-8 text-destructive" />
               <span>Hàng hư hỏng</span>
