@@ -33,15 +33,20 @@ export default function MyTrips() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
+  const reloadDashboard = () => {
     if (!user?.user_id) {
       setLoading(false);
       return;
     }
+    setLoading(true);
     getDeliveriesByShipperId(user.user_id)
       .then((data) => setDeliveries(Array.isArray(data) ? data : []))
       .catch(() => setDeliveries([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    reloadDashboard();
   }, [user?.user_id]);
 
   const myDeliveries = deliveries;
@@ -65,6 +70,7 @@ export default function MyTrips() {
       toast.error(e.message || 'Cập nhật thất bại');
     } finally {
       setIsUpdating(false);
+      reloadDashboard();
     }
   };
 
@@ -88,6 +94,7 @@ export default function MyTrips() {
       }
       setShowCompleteDialog(false);
       setSelectedOrder(null);
+      reloadDashboard();
     } catch (e) {
       toast.error(e.message || 'Cập nhật thất bại');
     } finally {

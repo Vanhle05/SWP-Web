@@ -21,7 +21,8 @@ export default function CoordinatorDashboard() {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const reloadDashboard = () => {
+    setLoading(true);
     Promise.all([
       fetchOrders().catch(() => []),
       getDeliveries().catch(() => []),
@@ -33,6 +34,10 @@ export default function CoordinatorDashboard() {
         setStores(Array.isArray(storesRes) ? storesRes : []);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    reloadDashboard();
   }, []);
 
   const waitingOrders = orders.filter((o) => o.status === 'WAITTING');

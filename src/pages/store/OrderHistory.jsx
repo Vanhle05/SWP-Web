@@ -37,15 +37,20 @@ export default function OrderHistory() {
   const [openOrders, setOpenOrders] = useState([]);
   const [cancelOrder, setCancelOrder] = useState(null);
 
-  useEffect(() => {
+  const reloadDashboard = () => {
     if (!user?.store_id) {
       setLoading(false);
       return;
     }
+    setLoading(true);
     getOrdersByStore(user.store_id)
       .then((data) => setOrders(Array.isArray(data) ? data : []))
       .catch(() => setOrders([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    reloadDashboard();
   }, [user?.store_id]);
 
   const storeOrders = [...orders].sort(
@@ -66,6 +71,7 @@ export default function OrderHistory() {
         prev.map((o) => (o.order_id === cancelOrder.order_id ? { ...o, status: 'CANCLED' } : o))
       );
       toast.success('Đơn hàng đã được hủy thành công');
+      reloadDashboard();
     } catch (e) {
       toast.error(e.message || 'Hủy đơn thất bại');
     }

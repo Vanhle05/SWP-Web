@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getDeliveries, getAllUsers, getAllStores } from '../../data/api';
+import { getDeliveries, getAllUsers, getAllStores, deleteDelivery } from '../../data/api';
+import { toast } from '../../components/ui/sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -68,6 +69,27 @@ export default function Deliveries() {
           </div>
           <StatusBadge status={delivery.status} type="delivery" />
         </div>
+          {delivery.status === 'WAITTING' && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="mt-2"
+              onClick={async () => {
+                if (!window.confirm('Bạn có chắc muốn hủy chuyến này?')) return;
+                try {
+                  await deleteDelivery(delivery.delivery_id);
+                  toast.success('Đã hủy chuyến thành công!');
+                  // Reload deliveries
+                  getDeliveries()
+                    .then((data) => setDeliveries(Array.isArray(data) ? data : []));
+                } catch (e) {
+                  toast.error(e.message || 'Hủy chuyến thất bại');
+                }
+              }}
+            >
+              Hủy chuyến
+            </Button>
+          )}
       </CardHeader>
       <CardContent className="space-y-4">
         {delivery.shipper && (

@@ -24,7 +24,8 @@ export default function KitchenDashboard() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const reloadDashboard = () => {
+    setLoading(true);
     Promise.all([
       getInventories().catch(() => []),
       getDeliveries().catch(() => []),
@@ -36,6 +37,10 @@ export default function KitchenDashboard() {
       setOrders(Array.isArray(ord) ? ord : []);
       setProducts(Array.isArray(prod) ? prod : []);
     }).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    reloadDashboard();
   }, []);
 
   const totalInventory = inventories.reduce((sum, inv) => sum + (inv.quantity ?? 0), 0);

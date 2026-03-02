@@ -21,6 +21,11 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    reloadDashboard();
+  }, []);
+
+  const reloadDashboard = () => {
+    setLoading(true);
     Promise.all([
       fetchOrders().catch(() => []),
       getInventories().catch(() => []),
@@ -30,7 +35,7 @@ export default function ManagerDashboard() {
       setInventories(Array.isArray(inv) ? inv : []);
       setProducts(Array.isArray(p) ? p : []);
     }).finally(() => setLoading(false));
-  }, []);
+  };
 
   const activePlans = 0;
   const pendingOrders = orders.filter((o) => o.status === 'WAITTING').length;

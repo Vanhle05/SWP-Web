@@ -321,6 +321,8 @@ export const createOrder = async (orderData) => {
   const response = await fetch(`${API_BASE_URL}/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+
+// Xóa chuyến giao hàng
     body: JSON.stringify({ storeId, comment, orderDetails }),
   });
   const data = await handleResponse(response);
@@ -477,11 +479,26 @@ export const assignShipperToDelivery = async (deliveryId, shipperId) => {
   return await handleResponse(response);
 };
 
+
 export const createDelivery = async (deliveryData) => {
-  // OpenAPI Spec hiện tại KHÔNG có endpoint POST /deliveries.
-  // Để tránh lỗi 405 Method Not Allowed, ta chặn ngay tại đây.
-  throw new Error("Chức năng tạo chuyến xe chưa được Lưu và Đanh hỗ trợ (Missing POST /deliveries).");
+  const response = await fetch(`${API_BASE_URL}/deliveries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(deliveryData),
+  });
+  return await handleResponse(response);
 };
+
+export async function deleteDelivery(deliveryId) {
+  const response = await fetch(`${API_BASE_URL}/deliveries/${deliveryId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+  return handleResponse(response);
+}
 
 // --- Inventory Transactions API ---
 
@@ -524,14 +541,22 @@ export const getInventoryById = async (inventoryId) => {
 // --- Log Batches API (cho Flow 3: Procurement) ---
 
 export const createPurchaseBatch = async (batchData) => {
-  // OpenAPI Spec không có endpoint /log-batches
-  throw new Error("Chức năng nhập lô hàng chưa được Lưu và Đanh hỗ trợ (Missing API).");
+  const response = await fetch(`${API_BASE_URL}/log-batches`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(batchData),
+  });
+  return await handleResponse(response);
 };
 
 // API tạo lô sản xuất (Production Batch)
 export const createBatch = async (batchData) => {
-  // OpenAPI Spec không có endpoint /log-batches
-  throw new Error("Chức năng tạo lô sản xuất chưa được Lưu và Đanh hỗ trợ (Missing API).");
+  const response = await fetch(`${API_BASE_URL}/log-batches`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(batchData),
+  });
+  return await handleResponse(response);
 };
 
 // API lấy kế hoạch sản xuất
