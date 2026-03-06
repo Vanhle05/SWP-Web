@@ -60,7 +60,7 @@ export default function CoordinatorDashboard() {
 
   const sortedOrders = [...orders].sort((a, b) => b.order_id - a.order_id);
   const waitingOrders = sortedOrders.filter((o) => o.status === 'WAITTING' && !o.delivery_id);
-  const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'PROCESSING' || d.status === 'DELIVERING');
+  const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'DELIVERING');
   const today = new Date().toISOString().split('T')[0];
   const todayDeliveries = enrichedDeliveries.filter((d) => (d.delivery_date || d.createdAt || '').startsWith(today));
   const completedToday = orders.filter(

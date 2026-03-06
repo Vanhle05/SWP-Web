@@ -53,8 +53,8 @@ export default function Deliveries() {
     status: calculateDeliveryStatus(d)
   })).sort((a, b) => b.delivery_id - a.delivery_id);
 
-  const waitingDeliveries = enrichedDeliveries.filter((d) => d.status === 'WAITTING');
-  const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'PROCESSING' || d.status === 'DELIVERING');
+  const waitingDeliveries = enrichedDeliveries.filter((d) => d.status === 'WAITTING' || d.status === 'PROCESSING');
+  const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'DELIVERING');
   const doneDeliveries = enrichedDeliveries.filter((d) => d.status === 'DONE');
 
   const formatDate = (dateString) => {
