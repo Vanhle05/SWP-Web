@@ -26,7 +26,7 @@ export default function Products() {
     setIsLoading(true);
     try {
       const data = await getProducts();
-      setProducts(data || []);
+      setProducts((data || []).sort((a, b) => b.product_id - a.product_id));
     } catch (error) {
       toast.error('Lỗi tải sản phẩm: ' + error.message);
     } finally {

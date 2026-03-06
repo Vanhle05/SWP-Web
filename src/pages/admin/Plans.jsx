@@ -56,7 +56,8 @@ export default function Plans() {
       setIsLoading(true);
       try {
         const data = await getProductionPlans();
-        setPlans(data?.details ? [data] : Array.isArray(data) ? data : []);
+        const rawPlans = data?.details ? [data] : Array.isArray(data) ? data : [];
+        setPlans([...rawPlans].sort((a, b) => b.planId - a.planId));
       } catch (error) {
         setPlans([]);
       } finally {
