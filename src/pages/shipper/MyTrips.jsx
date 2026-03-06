@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDeliveriesByShipperId, startDelivery, completeOrder, updateOrderStatus, deleteDelivery, getReceiptsByOrderId } from '../../data/api';
+import { getDeliveriesByShipperId, startDelivery, completeOrder, updateOrderStatus, getReceiptsByOrderId } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -81,19 +81,6 @@ export default function MyTrips() {
     }
   };
 
-  const handleCancelDelivery = async (deliveryId) => {
-    if (!confirm(`Bạn chắc chắn muốn từ chối chuyến giao hàng #${deliveryId}? Chuyến này sẽ được hủy bỏ để điều phối viên phân công lại.`)) return;
-    setIsStarting(deliveryId); // Use same loading state overlay for simplicity
-    try {
-      await deleteDelivery(deliveryId);
-      toast.success('Đã hủy chuyến giao hàng!');
-      reloadData();
-    } catch (error) {
-      toast.error('Lỗi khi hủy chuyến: ' + error.message);
-    } finally {
-      setIsStarting(null);
-    }
-  };
 
   const handleCompleteOrder = async (status) => {
     if (!selectedOrder) return;

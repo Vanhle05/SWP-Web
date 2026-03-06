@@ -89,7 +89,7 @@ export default function Deliveries() {
           </div>
           <StatusBadge status={delivery.status} type="delivery" />
         </div>
-        {delivery.status === 'WAITTING' && (
+        {(delivery.status === 'WAITTING' || delivery.status === 'PROCESSING') && (
           <Button
             variant="destructive"
             size="sm"
