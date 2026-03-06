@@ -179,26 +179,15 @@ export default function MyTrips() {
           </div>
 
           {showActions && deliveryStatus === 'WAITTING' && (
-            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+            <div className="flex justify-center mt-4">
               <Button
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="w-full sm:w-1/2 bg-blue-600 hover:bg-blue-700"
                 onClick={() => handleStartDelivery(delivery.delivery_id, delivery.orders)}
                 disabled={isDeliveryStarting}
               >
                 {isDeliveryStarting
                   ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
                   : <><Navigation className="mr-2 h-4 w-4" /> Nhận và giao</>
-                }
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 border-red-200 hover:bg-red-50 hover:text-red-700 text-red-600"
-                onClick={() => handleCancelDelivery(delivery.delivery_id)}
-                disabled={isDeliveryStarting}
-              >
-                {isDeliveryStarting
-                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang hủy...</>
-                  : <><AlertTriangle className="mr-2 h-4 w-4" /> Hủy / Từ chối chuyến</>
                 }
               </Button>
             </div>
