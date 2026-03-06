@@ -32,14 +32,28 @@ export default function Deliveries() {
       .finally(() => setLoading(false));
   }, []);
 
+  const calculateDeliveryStatus = (delivery) => {
+    if (!delivery.orders || delivery.orders.length === 0) return 'WAITTING';
+    const hasWaiting = delivery.orders.some(o => o.status === 'WAITTING');
+    const hasDelivering = delivery.orders.some(o => o.status === 'DELIVERING');
+    const hasProcessing = delivery.orders.some(o => o.status === 'PROCESSING');
+    const allDone = delivery.orders.every(o => o.status === 'DONE');
+    
+    if (allDone) return 'DONE';
+    if (hasDelivering) return 'DELIVERING';
+    if (hasProcessing) return 'PROCESSING';
+    return 'WAITTING';
+  };
+
   const enrichedDeliveries = deliveries.map((d) => ({
     ...d,
     orders: d.orders || [],
     shipper: d.shipper_name ? { full_name: d.shipper_name } : null,
+    status: calculateDeliveryStatus(d)
   }));
 
   const waitingDeliveries = enrichedDeliveries.filter((d) => d.status === 'WAITTING');
-  const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'PROCESSING');
+  const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'PROCESSING' || d.status === 'DELIVERING');
   const doneDeliveries = enrichedDeliveries.filter((d) => d.status === 'DONE');
 
   const formatDate = (dateString) => {

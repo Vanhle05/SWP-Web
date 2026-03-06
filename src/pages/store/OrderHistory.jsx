@@ -54,7 +54,7 @@ export default function OrderHistory() {
   }, [user?.store_id]);
 
   const storeOrders = [...orders].sort(
-    (a, b) => new Date(b.order_date || 0) - new Date(a.order_date || 0)
+    (a, b) => b.order_id - a.order_id
   );
 
   const toggleOrder = (orderId) => {
@@ -79,7 +79,13 @@ export default function OrderHistory() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    // Bù +7 tiếng nếu Server đang lưu giờ UTC
+    if (!dateString.includes('+07:00') && !dateString.includes('Z')) {
+       date.setHours(date.getHours() + 7);
+    }
+    return date.toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

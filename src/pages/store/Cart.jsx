@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
-import { getInventories, createOrder } from '../../data/api';
+import { createOrder } from '../../data/api';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -30,31 +30,20 @@ import {
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
 
-function getAvailableStock(inventories, productId) {
-  if (!Array.isArray(inventories)) return 0;
-  return inventories
-    .filter((inv) => inv.product_id === productId)
-    .reduce((sum, inv) => sum + (inv.quantity ?? 0), 0);
+function getAvailableStock(item) {
+  return item.available_stock || 0;
 }
 
 export default function Cart() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { items, updateQuantity, removeItem, clearCart, getTotalPrice } = useCart();
-  const [inventories, setInventories] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  useEffect(() => {
-    getInventories()
-      .then((data) => setInventories(Array.isArray(data) ? data : []))
-      .catch(() => setInventories([]));
-  }, []);
-
   const validateCart = () => {
     for (const item of items) {
-      const available = getAvailableStock(inventories, item.product_id);
+      const available = getAvailableStock(item);
       if (item.quantity > available) {
         return { valid: false, item, available };
       }
@@ -128,7 +117,7 @@ export default function Cart() {
         <div className="lg:col-span-2 space-y-4">
           <h1 className="text-2xl font-bold">Giỏ hàng ({items.length} sản phẩm)</h1>
           {items.map((item) => {
-            const available = getAvailableStock(inventories, item.product_id);
+            const available = getAvailableStock(item);
             const isOverStock = item.quantity > available;
             return (
               <Card key={item.product_id} className={isOverStock ? 'border-destructive' : ''}>
