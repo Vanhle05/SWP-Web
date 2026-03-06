@@ -11,7 +11,7 @@ export const ORDER_STATUS = {
 
 export const DELIVERY_STATUS = {
   WAITTING: { label: 'Chờ giao', color: 'warning', class: 'status-waiting' },
-  PROCESSING: { label: 'Đang giao', color: 'info', class: 'status-processing' },
+  PROCESSING: { label: 'Chờ giao', color: 'info', class: 'status-processing' },
   DONE: { label: 'Hoàn thành', color: 'success', class: 'status-done' },
 };
 

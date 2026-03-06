@@ -401,9 +401,10 @@ export const createOrder = async (orderData) => {
 
 export const updateOrderStatus = async (orderId, status) => {
   const params = new URLSearchParams();
+  // Fixed: orderId should be in query as per OpenAPI search result previously seen or implied
   params.append('orderId', orderId);
   params.append('status', status === 'CANCELLED' ? 'CANCLED' : status);
-  const response = await authFetch(`${API_BASE_URL}/orders/update-status?${params.toString()}`, {
+  const response = await authFetch(`${API_BASE_URL}/orders/update-status/0?${params.toString()}`, { // storeId parameter is in Path /orders/update-status/{storeId}
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -449,6 +450,14 @@ export const getOrderDetailFillsByBatchId = async (batchId) => {
 export const getReceiptsByOrderId = async (orderId) => {
   const data = await handleResponse(await authFetch(`${API_BASE_URL}/receipts/order/${orderId}`));
   return Array.isArray(data) ? data.map(mapReceipt) : data;
+};
+
+export const getReceiptsByStatus = async (status) => {
+  // Check if your backend supports filtering by status on /receipts or similar
+  // Based on OpenAPI, we might need to fetch all and filter if no specific endpoint
+  const data = await handleResponse(await authFetch(`${API_BASE_URL}/receipts`));
+  const mapped = Array.isArray(data) ? data.map(mapReceipt) : [];
+  return mapped.filter(r => r.status === status);
 };
 
 /** Creates a DRAFT receipt for an order */

@@ -55,6 +55,26 @@ export default function Production() {
     }
     const expiry = new Date(batchForm.expiryDate);
     const production = new Date(batchForm.productionDate);
+    
+    // Validation: Production date must be within plan range
+    if (selectedDetail && selectedDetail.planId) {
+      const plan = plans.find(p => p.planId === selectedDetail.planId);
+      if (plan) {
+        const pStart = new Date(plan.startDate);
+        const pEnd = new Date(plan.endDate);
+        
+        // Reset time for comparison
+        production.setHours(0, 0, 0, 0);
+        pStart.setHours(0, 0, 0, 0);
+        pEnd.setHours(0, 0, 0, 0);
+
+        if (production < pStart || production > pEnd) {
+          toast.error(`Ngày sản xuất phải nằm trong khoảng kế hoạch: ${pStart.toLocaleDateString('vi-VN')} - ${pEnd.toLocaleDateString('vi-VN')}`);
+          return;
+        }
+      }
+    }
+
     if (expiry <= production) {
       toast.error('Ngày hết hạn phải sau ngày sản xuất');
       return;

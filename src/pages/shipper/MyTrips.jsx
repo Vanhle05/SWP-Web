@@ -56,17 +56,28 @@ export default function MyTrips() {
     return 'WAITTING';
   };
 
-  const handleStartDelivery = async (delivery) => {
-    setStartingDeliveryId(delivery.delivery_id);
+  const handleStartDelivery = async (deliveryId, orders) => {
+    // Check if all orders have completed receipts
+    setIsStarting(deliveryId);
     try {
-      // PATCH /deliveries/{id}/start → orders become DELIVERING
-      await startDelivery(delivery.delivery_id);
-      toast.success('Đã bắt đầu chuyến giao hàng');
+      // For each order, check if there is a COMPLETED receipt
+      for (const order of orders) {
+        const orderReceipts = await getReceiptsByOrderId(order.order_id);
+        const hasCompleted = orderReceipts.some(r => r.status === 'COMPLETED');
+        if (!hasCompleted) {
+          toast.error(`Đơn hàng #${order.order_id} chưa được Kho xác nhận xuất. Vui lòng liên hệ thủ kho trước khi đi.`);
+          setIsStarting(null);
+          return;
+        }
+      }
+
+      await startDelivery(deliveryId);
+      toast.success('Đã bắt đầu chuyến giao hàng!');
       reloadData();
-    } catch (e) {
-      toast.error(e.message || 'Không thể bắt đầu chuyến giao');
+    } catch (error) {
+      toast.error('Lỗi khi bắt đầu giao hàng: ' + error.message);
     } finally {
-      setStartingDeliveryId(null);
+      setIsStarting(null);
     }
   };
 
@@ -102,7 +113,7 @@ export default function MyTrips() {
 
   const DeliveryCard = ({ delivery, showActions = true }) => {
     const deliveryStatus = getDeliveryStatus(delivery);
-    const isStarting = startingDeliveryId === delivery.delivery_id;
+    const isDeliveryStarting = isStarting === delivery.delivery_id;
 
     return (
       <Card>
@@ -155,8 +166,9 @@ export default function MyTrips() {
                   {(order.order_details || []).map(detail => (
                     <span
                       key={detail.order_detail_id || detail.product_id}
-                      className="inline-flex items-center gap-1 text-xs bg-background px-2 py-1 rounded border"
+                      className="inline-flex items-center gap-1 text-xs bg-background px-2 py-1 rounded border shadow-sm"
                     >
+                      <Package className="h-3 w-3 text-purple-500" />
                       {detail.product_name || `SP #${detail.product_id}`} ×{detail.quantity}
                     </span>
                   ))}
@@ -166,8 +178,13 @@ export default function MyTrips() {
           </div>
 
           {showActions && deliveryStatus === 'WAITTING' && (
-            <Button className="w-full" onClick={() => handleStartDelivery(delivery)} disabled={isStarting}>
-              {isStarting
+            <Button
+              className="w-full"
+              variant="default"
+              onClick={() => handleStartDelivery(delivery.delivery_id, delivery.orders)}
+              disabled={isDeliveryStarting}
+            >
+              {isDeliveryStarting
                 ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
                 : <><Navigation className="mr-2 h-4 w-4" /> Bắt đầu giao hàng</>
               }

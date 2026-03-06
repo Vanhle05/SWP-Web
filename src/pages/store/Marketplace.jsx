@@ -105,6 +105,9 @@ export default function Marketplace() {
                     Sẵn có: {available}
                   </span>
                 </div>
+                <div className="flex items-center gap-2">
+                   <Badge variant="outline" className="text-xs">Tính theo: WAITING + PROCESSING</Badge>
+                </div>
                 <div className="font-semibold text-primary">
                   {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price || 0)}
                 </div>
