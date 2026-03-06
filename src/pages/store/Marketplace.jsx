@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getProducts, getInventories, fetchOrders } from '../../data/api';
+import { getProducts } from '../../data/api';
 import { useCart } from '../../contexts/CartContext';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -10,8 +10,6 @@ import { toast } from 'sonner';
 
 export default function Marketplace() {
   const [products, setProducts] = useState([]);
-  const [inventories, setInventories] = useState([]);
-  const [activeOrders, setActiveOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quantities, setQuantities] = useState({});
   const { addToCart } = useCart();
@@ -20,23 +18,9 @@ export default function Marketplace() {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // 1. Lấy TẤT CẢ sản phẩm, sau đó lọc ở frontend.
-        // Cách này đáng tin cậy hơn phòng trường hợp API /get-by-type có lỗi.
         const allProductsData = await getProducts();
         const productsData = (allProductsData || []).filter(p => p.product_type === 'FINISHED_PRODUCT');
-        
-        // 2. Lấy tồn kho và đơn hàng để tính Available Stock (BR-005)
-        // Lưu ý: Nếu user Store không có quyền gọi getInventories, backend sẽ trả lỗi.
-        // Ở đây giả định hệ thống cho phép Store xem số lượng tồn kho tổng.
-        const [invData, ordersData] = await Promise.all([
-          getInventories().catch(() => []), 
-          fetchOrders().catch(() => [])
-        ]);
-
         setProducts(productsData || []);
-        setInventories(invData || []);
-        // Lọc các đơn hàng đang giữ chỗ (WAITING, PROCESSING)
-        setActiveOrders((ordersData || []).filter(o => ['WAITING', 'PROCESSING'].includes(o.status)));
       } catch (error) {
         toast.error('Lỗi tải dữ liệu: ' + error.message);
       } finally {
@@ -45,22 +29,6 @@ export default function Marketplace() {
     };
     loadData();
   }, []);
-
-  // Tính tồn kho khả dụng cho từng sản phẩm
-  const getAvailableStock = (productId) => {
-    // Tổng tồn kho vật lý
-    const totalStock = inventories
-      .filter(inv => inv.product_id === productId)
-      .reduce((sum, inv) => sum + (inv.quantity || 0), 0);
-
-    // Tổng hàng đang được giữ trong các đơn chưa hoàn thành
-    const reservedStock = activeOrders.reduce((sum, order) => {
-      const detail = order.order_details?.find(d => d.product_id === productId);
-      return sum + (detail ? detail.quantity : 0);
-    }, 0);
-
-    return Math.max(0, totalStock - reservedStock);
-  };
 
   const handleQuantityChange = (productId, delta) => {
     setQuantities(prev => {
@@ -72,7 +40,7 @@ export default function Marketplace() {
 
   const handleAddToCart = (product) => {
     const quantity = quantities[product.product_id] || 1;
-    const available = getAvailableStock(product.product_id);
+    const available = product.available_stock || 0;
 
     if (quantity > available) {
       toast.error(`Chỉ còn ${available} ${product.unit} khả dụng.`);
@@ -97,7 +65,7 @@ export default function Marketplace() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {products.map(product => {
-          const available = getAvailableStock(product.product_id);
+          const available = product.available_stock || 0;
           const quantity = quantities[product.product_id] || 1;
 
           return (
