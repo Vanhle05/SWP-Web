@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDeliveriesByShipperId, startDelivery, completeOrder, updateOrderStatus } from '../../data/api';
+import { getDeliveriesByShipperId, startDelivery, completeOrder, updateOrderStatus, deleteDelivery, getReceiptsByOrderId } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -31,7 +31,7 @@ export default function MyTrips() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [startingDeliveryId, setStartingDeliveryId] = useState(null);
+  const [isStarting, setIsStarting] = useState(null);
 
   const reloadData = () => {
     if (!user?.user_id) { setLoading(false); return; }
@@ -76,6 +76,20 @@ export default function MyTrips() {
       reloadData();
     } catch (error) {
       toast.error('Lỗi khi bắt đầu giao hàng: ' + error.message);
+    } finally {
+      setIsStarting(null);
+    }
+  };
+
+  const handleCancelDelivery = async (deliveryId) => {
+    if (!confirm(`Bạn chắc chắn muốn từ chối chuyến giao hàng #${deliveryId}? Chuyến này sẽ được hủy bỏ để điều phối viên phân công lại.`)) return;
+    setIsStarting(deliveryId); // Use same loading state overlay for simplicity
+    try {
+      await deleteDelivery(deliveryId);
+      toast.success('Đã hủy chuyến giao hàng!');
+      reloadData();
+    } catch (error) {
+      toast.error('Lỗi khi hủy chuyến: ' + error.message);
     } finally {
       setIsStarting(null);
     }
@@ -178,17 +192,29 @@ export default function MyTrips() {
           </div>
 
           {showActions && deliveryStatus === 'WAITTING' && (
-            <Button
-              className="w-full"
-              variant="default"
-              onClick={() => handleStartDelivery(delivery.delivery_id, delivery.orders)}
-              disabled={isDeliveryStarting}
-            >
-              {isDeliveryStarting
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
-                : <><Navigation className="mr-2 h-4 w-4" /> Bắt đầu giao hàng</>
-              }
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 mt-4">
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                onClick={() => handleStartDelivery(delivery.delivery_id, delivery.orders)}
+                disabled={isDeliveryStarting}
+              >
+                {isDeliveryStarting
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
+                  : <><Navigation className="mr-2 h-4 w-4" /> Bắt nhận đơn & Giao hàng</>
+                }
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 border-red-200 hover:bg-red-50 hover:text-red-700 text-red-600"
+                onClick={() => handleCancelDelivery(delivery.delivery_id)}
+                disabled={isDeliveryStarting}
+              >
+                {isDeliveryStarting
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang hủy...</>
+                  : <><AlertTriangle className="mr-2 h-4 w-4" /> Hủy / Từ chối chuyến</>
+                }
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

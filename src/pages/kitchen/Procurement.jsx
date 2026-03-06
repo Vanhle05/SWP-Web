@@ -169,13 +169,13 @@ export default function KitchenProcurement() {
             <div className="bg-green-50 border border-green-200 text-green-800 p-3 rounded-md flex items-start gap-2 text-sm">
               <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
               <span>
-                Lô hàng mua sẽ được tạo với trạng thái <strong>DONE</strong> và hệ thống tự động 
+                Lô hàng mua sẽ được tạo với trạng thái <strong>DONE</strong> và hệ thống tự động
                 tạo giao dịch IMPORT, cộng số lượng vào kho.
               </span>
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting 
+              {isSubmitting
                 ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
                 : <><ShoppingCart className="mr-2 h-4 w-4" /> Xác nhận Nhập kho</>
               }

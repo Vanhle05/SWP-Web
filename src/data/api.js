@@ -241,8 +241,8 @@ const parseJwt = (token) => {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
     }).join(''));
     return JSON.parse(jsonPayload);
   } catch (e) {
@@ -453,11 +453,12 @@ export const getReceiptsByOrderId = async (orderId) => {
 };
 
 export const getReceiptsByStatus = async (status) => {
-  // Check if your backend supports filtering by status on /receipts or similar
-  // Based on OpenAPI, we might need to fetch all and filter if no specific endpoint
-  const data = await handleResponse(await authFetch(`${API_BASE_URL}/receipts`));
-  const mapped = Array.isArray(data) ? data.map(mapReceipt) : [];
-  return mapped.filter(r => r.status === status);
+  // Since there is no /receipts endpoint that returns all receipts globally,
+  // we must get all orders, then fetch receipts for all relevant orders, and filter.
+  // This is a workaround. To be efficient, we might only fetch receipts for certain orders.
+  // However, for the Warehouse Outbound, we just need receipts for orders we are dealing with.
+  // We will change the component logic to simply filter its known receipts.
+  return []; // Placeholder. We will handle this in the component.
 };
 
 /** Creates a DRAFT receipt for an order */
@@ -480,6 +481,8 @@ export const confirmReceipt = async (receiptId) => {
   const data = await handleResponse(response);
   return data ? mapReceipt(data) : data;
 };
+
+
 
 // --- Product API ---
 

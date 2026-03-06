@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchOrders, getOrdersByStatus, getOrderDetailFillsByOrderDetailId, getReceiptsByOrderId, createReceipt, confirmReceipt, getAllLogBatches, getReceiptsByStatus } from '../../data/api';
+import { fetchOrders, getOrdersByStatus, getOrderDetailFillsByOrderDetailId, getReceiptsByOrderId, createReceipt, confirmReceipt, updateOrderStatus } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
@@ -30,24 +30,49 @@ export default function WarehouseOutbound() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [pOrders, dOrders, rDraft, rComp, rCanc] = await Promise.all([
+      // Vì không có api lấy danh sách toàn bộ phiếu xuất theo status, 
+      // ta lấy đơn PROCESSING và DELIVERING, sau đó kéo phiếu của chúng.
+      // Để lấy được cả receipts CANCELLED/COMPLETED từ các đơn cũ, 
+      // lý tưởng là kéo toàn bộ đơn hàng nhưng sẽ nặng.
+      // Tạm thời ta kéo các đơn DONE và CANCLED gần nhất để phân loại (nhưng chỉ lấy 1 phần).
+      const [pOrders, dOrders, doneO] = await Promise.all([
         getOrdersByStatus('PROCESSING').catch(() => []),
         getOrdersByStatus('DELIVERING').catch(() => []),
-        getReceiptsByStatus('DRAFT').catch(() => []),
-        getReceiptsByStatus('COMPLETED').catch(() => []),
-        getReceiptsByStatus('CANCELLED').catch(() => []),
+        getOrdersByStatus('DONE').catch(() => []),
       ]);
 
-      const allRelevantOrders = [...pOrders, ...dOrders];
+      const allRelevantOrders = [...pOrders, ...dOrders]; // For Draft tab
+      
       const uniqueOrders = Array.from(new Set(allRelevantOrders.map(o => o.order_id)))
         .map(id => allRelevantOrders.find(o => o.order_id === id))
         .sort((a, b) => b.order_id - a.order_id);
 
       setProcessingOrders(uniqueOrders);
+
+      // Lấy tất cả receipts cho các đơn hàng relevant + done
+      const scanOrders = [...uniqueOrders, ...doneO.slice(0, 30)];
+      const scanOrderIds = Array.from(new Set(scanOrders.map(o => o.order_id)));
+
+      let rComp = [];
+      const newOrderReceipts = {};
+
+      const receiptPromises = scanOrderIds.map(oid => 
+        getReceiptsByOrderId(oid).then(res => {
+          if (Array.isArray(res)) {
+            newOrderReceipts[oid] = res;
+            res.forEach(r => {
+              if (r.status === 'COMPLETED') rComp.push(r);
+            });
+          }
+        }).catch(() => {})
+      );
+
+      await Promise.all(receiptPromises);
+
+      setOrderReceipts(newOrderReceipts);
       setReceipts({
-        DRAFT: rDraft || [],
-        COMPLETED: rComp || [],
-        CANCELLED: rCanc || []
+        ...receipts,
+        COMPLETED: rComp.sort((a,b) => b.receipt_id - a.receipt_id),
       });
     } catch (error) {
       toast.error('Lỗi tải dữ liệu: ' + error.message);
@@ -124,13 +149,24 @@ export default function WarehouseOutbound() {
       toast.success('Xuất kho hoàn tất! Tồn kho đã được cập nhật.');
       await fetchData();
       setExpandedOrder(null);
-      setOrderReceipts(prev => {
-        const next = { ...prev };
-        delete next[order.order_id];
-        return next;
-      });
     } catch (error) {
       toast.error('Lỗi xác nhận xuất kho: ' + error.message);
+    } finally {
+      setProcessingOrderId(null);
+    }
+  };
+
+  const handleCancelReceipt = async (order, receipt) => {
+    // Không có API hủy phiếu, giải pháp thay thế là hủy luôn đơn hàng nếu còn là nháp
+    if (!confirm(`Hủy phiếu nháp #${receipt.receipt_id} sẽ làm HỦY luôn đơn hàng #${order.order_id} của cửa hàng.\nBạn có chắc chắn muốn tiếp tục?`)) return;
+    setProcessingOrderId(order.order_id);
+    try {
+      await updateOrderStatus(order.order_id, 'CANCLED');
+      toast.success(`Đã hủy đơn hàng #${order.order_id} và phiếu xuất tương ứng.`);
+      await fetchData();
+      setExpandedOrder(null);
+    } catch (error) {
+      toast.error('Lỗi hủy phiếu/đơn hàng: ' + error.message);
     } finally {
       setProcessingOrderId(null);
     }
@@ -265,10 +301,15 @@ export default function WarehouseOutbound() {
                           Tạo Phiếu Xuất
                         </Button>
                       ) : draftReceipt && !completedReceipt ? (
-                        <Button onClick={() => handleConfirmReceipt(order, draftReceipt)} disabled={isProcessing} className="w-full bg-green-600">
-                          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4" />}
-                          Hoàn tất Xuất kho
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button onClick={() => handleConfirmReceipt(order, draftReceipt)} disabled={isProcessing} className="flex-1 bg-green-600">
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4" />}
+                            Hoàn tất Xuất kho
+                          </Button>
+                          <Button onClick={() => handleCancelReceipt(order, draftReceipt)} disabled={isProcessing} variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 px-3">
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                          </Button>
+                        </div>
                       ) : (
                         <div className="w-full p-2 bg-green-50 text-green-700 text-xs text-center rounded border border-green-200 flex items-center justify-center gap-2">
                           <CheckCircle2 className="h-4 w-4" /> Đã hoàn tất xuất kho
@@ -328,16 +369,12 @@ export default function WarehouseOutbound() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px] mb-6">
+        <TabsList className="grid w-full grid-cols-2 lg:w-[400px] mb-6">
           <TabsTrigger value="draft">Soạn hàng</TabsTrigger>
-          <TabsTrigger value="receipts-draft">Phiếu Nháp</TabsTrigger>
-          <TabsTrigger value="receipts-completed">Đã Xuất</TabsTrigger>
-          <TabsTrigger value="receipts-cancelled">Đã Hủy</TabsTrigger>
+          <TabsTrigger value="receipts-completed">Phiếu đã xuất</TabsTrigger>
         </TabsList>
         <TabsContent value="draft">{renderOrdersList()}</TabsContent>
-        <TabsContent value="receipts-draft">{renderReceiptsList('DRAFT')}</TabsContent>
         <TabsContent value="receipts-completed">{renderReceiptsList('COMPLETED')}</TabsContent>
-        <TabsContent value="receipts-cancelled">{renderReceiptsList('CANCELLED')}</TabsContent>
       </Tabs>
     </div>
   );

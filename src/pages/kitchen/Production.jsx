@@ -55,14 +55,14 @@ export default function Production() {
     }
     const expiry = new Date(batchForm.expiryDate);
     const production = new Date(batchForm.productionDate);
-    
+
     // Validation: Production date must be within plan range
     if (selectedDetail && selectedDetail.planId) {
       const plan = plans.find(p => p.planId === selectedDetail.planId);
       if (plan) {
         const pStart = new Date(plan.startDate);
         const pEnd = new Date(plan.endDate);
-        
+
         // Reset time for comparison
         production.setHours(0, 0, 0, 0);
         pStart.setHours(0, 0, 0, 0);
@@ -159,10 +159,10 @@ export default function Production() {
                       </span>
                       <span>→</span>
                       <span>{plan.endDate ? (() => {
-                          const d = new Date(plan.endDate);
-                          if (!plan.endDate.includes('+07:00') && !plan.endDate.includes('Z')) d.setHours(d.getHours() + 7);
-                          return d.toLocaleDateString('vi-VN');
-                        })() : 'N/A'}</span>
+                        const d = new Date(plan.endDate);
+                        if (!plan.endDate.includes('+07:00') && !plan.endDate.includes('Z')) d.setHours(d.getHours() + 7);
+                        return d.toLocaleDateString('vi-VN');
+                      })() : 'N/A'}</span>
                     </div>
                     {plan.note && <p className="text-sm text-muted-foreground mt-1">{plan.note}</p>}
                   </div>
@@ -188,7 +188,7 @@ export default function Production() {
                           </p>
                           {detail.note && <p className="text-xs text-muted-foreground mt-1">{detail.note}</p>}
                         </div>
-                        <Button 
+                        <Button
                           onClick={() => openDialog(detail, plan.planId)}
                           className="bg-orange-500 hover:bg-orange-600"
                         >
@@ -245,7 +245,7 @@ export default function Production() {
               </div>
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-sm text-orange-800">
-              <strong>Lưu ý:</strong> Lô sẽ được tạo với trạng thái <strong>PROCESSING</strong>. 
+              <strong>Lưu ý:</strong> Lô sẽ được tạo với trạng thái <strong>PROCESSING</strong>.
               Khi Kho xác nhận nhập, trạng thái sẽ chuyển thành DONE và tồn kho sẽ được cập nhật.
             </div>
             <Button onClick={handleCreateBatch} disabled={isSubmitting} className="w-full">
