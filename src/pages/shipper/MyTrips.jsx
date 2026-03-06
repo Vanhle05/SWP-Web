@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDeliveriesByShipperId, updateOrderStatus } from '../../data/api';
+import { getDeliveriesByShipperId, startDelivery, completeOrder, updateOrderStatus } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -16,7 +16,6 @@ import {
 import {
   Truck,
   MapPin,
-  Phone,
   Package,
   Navigation,
   CheckCircle2,
@@ -32,45 +31,42 @@ export default function MyTrips() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [startingDeliveryId, setStartingDeliveryId] = useState(null);
 
-  const reloadDashboard = () => {
-    if (!user?.user_id) {
-      setLoading(false);
-      return;
-    }
+  const reloadData = () => {
+    if (!user?.user_id) { setLoading(false); return; }
     setLoading(true);
     getDeliveriesByShipperId(user.user_id)
-      .then((data) => setDeliveries(Array.isArray(data) ? data : []))
+      .then(data => setDeliveries(Array.isArray(data) ? data : []))
       .catch(() => setDeliveries([]))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => {
-    reloadDashboard();
-  }, [user?.user_id]);
+  useEffect(() => { reloadData(); }, [user?.user_id]);
 
-  const myDeliveries = deliveries;
-  const activeDeliveries = myDeliveries.filter((d) => d.status === 'PROCESSING');
-  const waitingDeliveries = myDeliveries.filter((d) => d.status === 'WAITTING');
-  const completedDeliveries = myDeliveries.filter((d) => d.status === 'DONE');
+  /**
+   * Xác định trạng thái của delivery dựa trên orders bên trong
+   * (DeliveryResponse không có field `status` riêng)
+   */
+  const getDeliveryStatus = (delivery) => {
+    const orders = delivery.orders || [];
+    if (orders.length === 0) return 'WAITTING';
+    if (orders.every(o => o.status === 'DONE' || o.status === 'DAMAGED' || o.status === 'CANCLED')) return 'DONE';
+    if (orders.some(o => o.status === 'DELIVERING')) return 'DELIVERING';
+    return 'WAITTING';
+  };
 
   const handleStartDelivery = async (delivery) => {
-    setIsUpdating(true);
+    setStartingDeliveryId(delivery.delivery_id);
     try {
-      await updateOrderStatus(delivery.orders?.[0]?.order_id, 'DELIVERING');
-      setDeliveries((prev) =>
-        prev.map((d) =>
-          d.delivery_id === delivery.delivery_id
-            ? { ...d, status: 'PROCESSING', orders: (d.orders || []).map((o) => ({ ...o, status: 'DELIVERING' })) }
-            : d
-        )
-      );
+      // PATCH /deliveries/{id}/start → orders become DELIVERING
+      await startDelivery(delivery.delivery_id);
       toast.success('Đã bắt đầu chuyến giao hàng');
+      reloadData();
     } catch (e) {
-      toast.error(e.message || 'Cập nhật thất bại');
+      toast.error(e.message || 'Không thể bắt đầu chuyến giao');
     } finally {
-      setIsUpdating(false);
-      reloadDashboard();
+      setStartingDeliveryId(null);
     }
   };
 
@@ -78,23 +74,18 @@ export default function MyTrips() {
     if (!selectedOrder) return;
     setIsUpdating(true);
     try {
-      await updateOrderStatus(selectedOrder.order_id, status);
-      setDeliveries((prev) =>
-        prev.map((d) => ({
-          ...d,
-          orders: (d.orders || []).map((o) =>
-            o.order_id === selectedOrder.order_id ? { ...o, status } : o
-          ),
-        }))
-      );
       if (status === 'DONE') {
+        // PATCH /orders/{id}/complete
+        await completeOrder(selectedOrder.order_id);
         toast.success(`Đã giao thành công đơn hàng #${selectedOrder.order_id}`);
       } else {
+        // DAMAGED — dùng updateOrderStatus
+        await updateOrderStatus(selectedOrder.order_id, 'DAMAGED');
         toast.warning(`Đã báo cáo đơn hàng #${selectedOrder.order_id} bị hư hỏng`);
       }
       setShowCompleteDialog(false);
       setSelectedOrder(null);
-      reloadDashboard();
+      reloadData();
     } catch (e) {
       toast.error(e.message || 'Cập nhật thất bại');
     } finally {
@@ -103,93 +94,89 @@ export default function MyTrips() {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('vi-VN', {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
+      weekday: 'short', day: '2-digit', month: '2-digit',
     });
   };
 
-  const DeliveryCard = ({ delivery, showActions = true }) => (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <Truck className="h-6 w-6 text-primary" />
+  const DeliveryCard = ({ delivery, showActions = true }) => {
+    const deliveryStatus = getDeliveryStatus(delivery);
+    const isStarting = startingDeliveryId === delivery.delivery_id;
+
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                <Truck className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Chuyến #{delivery.delivery_id}</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {formatDate(delivery.delivery_date)} • {(delivery.orders || []).length} điểm giao
+                </p>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-base">Chuyến #{delivery.delivery_id}</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {formatDate(delivery.delivery_date)} • {(delivery.orders || []).length} điểm giao
-              </p>
-            </div>
+            <StatusBadge status={deliveryStatus} type="delivery" />
           </div>
-          <StatusBadge status={delivery.status} type="delivery" />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
-          {(delivery.orders || []).map((order, index) => (
-            <div key={order.order_id} className="p-3 bg-muted/50 rounded-lg space-y-2">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full border text-sm font-medium">
-                    {index + 1}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            {(delivery.orders || []).map((order, index) => (
+              <div key={order.order_id} className="p-3 bg-muted/50 rounded-lg space-y-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full border text-sm font-medium">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium">{order.store_name}</p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        Cửa hàng #{order.store_id}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{order.store_name}</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {order.store_id}
-                    </p>
-                  </div>
+                  {showActions && order.status === 'DELIVERING' && (
+                    <Button
+                      size="sm"
+                      onClick={() => { setSelectedOrder(order); setShowCompleteDialog(true); }}
+                    >
+                      Hoàn thành
+                    </Button>
+                  )}
+                  {(order.status === 'DONE' || order.status === 'DAMAGED') && (
+                    <StatusBadge status={order.status} type="order" />
+                  )}
                 </div>
-                {showActions && delivery.status === 'PROCESSING' && order.status === 'DELIVERING' && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setShowCompleteDialog(true);
-                    }}
-                  >
-                    Hoàn thành
-                  </Button>
-                )}
-                {(order.status === 'DONE' || order.status === 'DAMAGED') && (
-                  <StatusBadge status={order.status} type="order" />
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {(order.order_details || []).map(detail => (
+                    <span
+                      key={detail.order_detail_id || detail.product_id}
+                      className="inline-flex items-center gap-1 text-xs bg-background px-2 py-1 rounded border"
+                    >
+                      {detail.product_name || `SP #${detail.product_id}`} ×{detail.quantity}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {(order.order_details || []).map((detail) => (
-                  <span
-                    key={detail.order_detail_id || detail.product_id}
-                    className="inline-flex items-center gap-1 text-xs bg-background px-2 py-1 rounded"
-                  >
-                    {detail.product_name || `SP #${detail.product_id}`} x{detail.quantity}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        {showActions && delivery.status === 'WAITTING' && (
-          <Button
-            className="w-full"
-            onClick={() => handleStartDelivery(delivery)}
-            // Xóa disabled, luôn cho thao tác
-          >
-            {isUpdating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Navigation className="mr-2 h-4 w-4" />
-            )}
-            Bắt đầu giao hàng
-          </Button>
-        )}
-      </CardContent>
-    </Card>
-  );
+            ))}
+          </div>
+
+          {showActions && deliveryStatus === 'WAITTING' && (
+            <Button className="w-full" onClick={() => handleStartDelivery(delivery)} disabled={isStarting}>
+              {isStarting
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
+                : <><Navigation className="mr-2 h-4 w-4" /> Bắt đầu giao hàng</>
+              }
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (loading) {
     return (
@@ -199,17 +186,17 @@ export default function MyTrips() {
     );
   }
 
-  if (myDeliveries.length === 0) {
+  if (deliveries.length === 0) {
     return (
       <div className="p-6">
-        <EmptyState
-          icon={Truck}
-          title="Chưa có chuyến giao hàng"
-          description="Bạn chưa được phân công chuyến giao hàng nào"
-        />
+        <EmptyState icon={Truck} title="Chưa có chuyến giao hàng" description="Bạn chưa được phân công chuyến giao hàng nào" />
       </div>
     );
   }
+
+  const deliveringTrips = deliveries.filter(d => getDeliveryStatus(d) === 'DELIVERING');
+  const waitingTrips = deliveries.filter(d => getDeliveryStatus(d) === 'WAITTING');
+  const doneTrips = deliveries.filter(d => getDeliveryStatus(d) === 'DONE');
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
@@ -218,39 +205,30 @@ export default function MyTrips() {
         <p className="text-muted-foreground">Quản lý và theo dõi các chuyến giao hàng</p>
       </div>
 
-      {activeDeliveries.length > 0 && (
+      {deliveringTrips.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Navigation className="h-5 w-5 text-info" />
-            Đang giao hàng
+            <Navigation className="h-5 w-5 text-blue-500" /> Đang giao hàng
           </h2>
-          {activeDeliveries.map((d) => (
-            <DeliveryCard key={d.delivery_id} delivery={d} />
-          ))}
+          {deliveringTrips.map(d => <DeliveryCard key={d.delivery_id} delivery={d} />)}
         </div>
       )}
 
-      {waitingDeliveries.length > 0 && (
+      {waitingTrips.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Package className="h-5 w-5 text-warning" />
-            Chờ nhận hàng
+            <Package className="h-5 w-5 text-yellow-500" /> Chờ nhận hàng
           </h2>
-          {waitingDeliveries.map((d) => (
-            <DeliveryCard key={d.delivery_id} delivery={d} />
-          ))}
+          {waitingTrips.map(d => <DeliveryCard key={d.delivery_id} delivery={d} />)}
         </div>
       )}
 
-      {completedDeliveries.length > 0 && (
+      {doneTrips.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            Đã hoàn thành
+            <CheckCircle2 className="h-5 w-5 text-green-500" /> Đã hoàn thành
           </h2>
-          {completedDeliveries.map((d) => (
-            <DeliveryCard key={d.delivery_id} delivery={d} showActions={false} />
-          ))}
+          {doneTrips.map(d => <DeliveryCard key={d.delivery_id} delivery={d} showActions={false} />)}
         </div>
       )}
 
@@ -259,33 +237,32 @@ export default function MyTrips() {
           <DialogHeader>
             <DialogTitle>Hoàn thành giao hàng</DialogTitle>
             <DialogDescription>
-              Xác nhận trạng thái đơn hàng #{selectedOrder?.order_id} - {selectedOrder?.store_name}
+              Xác nhận trạng thái đơn hàng #{selectedOrder?.order_id} — {selectedOrder?.store_name}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-4">
             <Button
               variant="outline"
-              className="h-24 flex-col gap-2 border-success hover:bg-success/10"
+              className="h-24 flex-col gap-2 border-green-400 hover:bg-green-50"
               onClick={() => handleCompleteOrder('DONE')}
-              // Xóa disabled, luôn cho thao tác
+              disabled={isUpdating}
             >
-              <CheckCircle2 className="h-8 w-8 text-success" />
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
               <span>Giao thành công</span>
             </Button>
             <Button
               variant="outline"
-              className="h-24 flex-col gap-2 border-destructive hover:bg-destructive/10"
+              className="h-24 flex-col gap-2 border-red-400 hover:bg-red-50"
               onClick={() => handleCompleteOrder('DAMAGED')}
-              // Xóa disabled, luôn cho thao tác
+              disabled={isUpdating}
             >
-              <AlertTriangle className="h-8 w-8 text-destructive" />
+              <AlertTriangle className="h-8 w-8 text-red-500" />
               <span>Hàng hư hỏng</span>
             </Button>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowCompleteDialog(false)}>
-              Hủy
-            </Button>
+            {isUpdating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+            <Button variant="ghost" onClick={() => setShowCompleteDialog(false)} disabled={isUpdating}>Hủy</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

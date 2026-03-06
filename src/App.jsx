@@ -30,11 +30,7 @@ import ProductionPlanning from "./pages/manager/ProductionPlanning";
 // Kitchen pages
 import KitchenDashboard from "./pages/kitchen/Dashboard";
 import Production from "./pages/kitchen/Production";
-import Inventory from "./pages/kitchen/Inventory";
-import Outbound from "./pages/kitchen/Outbound";
-import Procurement from "./pages/kitchen/Procurement";
-import Waste from "./pages/kitchen/Waste";
-import StockCard from "./pages/kitchen/StockCard";
+import KitchenProcurement from "./pages/kitchen/Procurement";
 import RecipeViewer from "./pages/kitchen/RecipeViewer";
 
 // Shipper pages
@@ -50,6 +46,10 @@ import Plans from "./pages/admin/Plans";
 
 // Warehouse pages
 import WarehouseDashboard from "./pages/warehouse/Dashboard";
+import WarehouseInventory from "./pages/warehouse/Inventory";
+import WarehouseOutbound from "./pages/warehouse/Outbound";
+import WarehouseProcurement from "./pages/warehouse/Procurement";
+import WarehouseWaste from "./pages/warehouse/Waste";
 
 const queryClient = new QueryClient();
 
@@ -102,11 +102,7 @@ const App = () => (
                 <Route element={<ProtectedRoute allowedRoles={[ROLE_ID.KITCHEN_MANAGER]}><Outlet /></ProtectedRoute>}>
                   <Route path="/kitchen" element={<KitchenDashboard />} />
                   <Route path="/kitchen/production" element={<Production />} />
-                  <Route path="/kitchen/inventory" element={<Inventory />} />
-                  <Route path="/kitchen/outbound" element={<Outbound />} />
-                  <Route path="/kitchen/procurement" element={<Procurement />} />
-                  <Route path="/kitchen/waste" element={<Waste />} />
-                  <Route path="/kitchen/stock-card" element={<StockCard />} />
+                  <Route path="/kitchen/procurement" element={<KitchenProcurement />} />
                   <Route path="/kitchen/recipes" element={<RecipeViewer />} />
                 </Route>
 
@@ -119,10 +115,10 @@ const App = () => (
                 {/* Warehouse routes (ID 7) */}
                 <Route element={<ProtectedRoute allowedRoles={[7]}><Outlet /></ProtectedRoute>}>
                   <Route path="/warehouse" element={<WarehouseDashboard />} />
-                  <Route path="/warehouse/inventory" element={<Inventory />} />
-                  <Route path="/warehouse/procurement" element={<Procurement />} />
-                  <Route path="/warehouse/outbound" element={<Outbound />} />
-                  <Route path="/warehouse/waste" element={<Waste />} />
+                  <Route path="/warehouse/inventory" element={<WarehouseInventory />} />
+                  <Route path="/warehouse/procurement" element={<WarehouseProcurement />} />
+                  <Route path="/warehouse/outbound" element={<WarehouseOutbound />} />
+                  <Route path="/warehouse/waste" element={<WarehouseWaste />} />
                 </Route>
 
                 {/* Admin routes */}

@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { getProductsByType, createPurchaseBatch } from '../../data/api';
+import { getProductsByType, createBatch } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Loader2, ShoppingCart, Calendar as CalendarIcon, AlertTriangle } from 'lucide-react';
+import { Loader2, ShoppingCart, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function Procurement() {
+export default function WarehouseProcurement() {
   const [materials, setMaterials] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const today = new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState({
     productId: '',
-    batchId: '',
     quantity: '',
-    expiryDate: ''
+    productionDate: today,
+    expiryDate: '',
   });
 
   useEffect(() => {
@@ -36,12 +38,15 @@ export default function Procurement() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.productId || !formData.batchId || !formData.quantity || !formData.expiryDate) {
-      toast.error('Vui lòng điền đầy đủ thông tin');
+    if (!formData.productId || !formData.quantity || !formData.expiryDate) {
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
+    }
+    if (Number(formData.quantity) <= 0) {
+      toast.error('Số lượng phải lớn hơn 0');
       return;
     }
 
-    // BR-022: Cảnh báo hạn sử dụng
     const expiry = new Date(formData.expiryDate);
     const now = new Date();
     const diffDays = (expiry - now) / (1000 * 60 * 60 * 24);
@@ -53,17 +58,16 @@ export default function Procurement() {
 
     setIsSubmitting(true);
     try {
-      await createPurchaseBatch({
+      await createBatch({
         productId: Number(formData.productId),
-        batchId: formData.batchId, // Backend có thể cần map sang 'batch' hoặc giữ nguyên tùy model
-        batch: formData.batchId,   // Gửi cả 2 field để an toàn
         quantity: Number(formData.quantity),
-        expiryDate: new Date(formData.expiryDate).toISOString(),
+        productionDate: formData.productionDate,
+        expiryDate: formData.expiryDate,
         type: 'PURCHASE',
-        status: 'DONE'
+        status: 'DONE',
       });
-      toast.success('Nhập kho thành công!');
-      setFormData({ productId: '', batchId: '', quantity: '', expiryDate: '' });
+      toast.success('Nhập kho thành công! Tồn kho đã được cập nhật.');
+      setFormData({ productId: '', quantity: '', productionDate: today, expiryDate: '' });
     } catch (error) {
       toast.error('Lỗi nhập kho: ' + error.message);
     } finally {
@@ -71,25 +75,28 @@ export default function Procurement() {
     }
   };
 
-  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
+  if (isLoading) return (
+    <div className="flex justify-center items-center h-96">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 
   return (
     <div className="p-6 max-w-2xl mx-auto animate-fade-in">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl">
-            <ShoppingCart className="h-6 w-6 text-primary" /> Nhập mua Nguyên liệu
+            <ShoppingCart className="h-6 w-6 text-green-600" /> Nhập mua Nguyên liệu
           </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Ghi nhận lô nguyên liệu mua từ nhà cung cấp. Tồn kho sẽ được cập nhật tự động.
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-md flex items-center gap-2 mb-4">
-            <AlertTriangle className="h-5 w-5" />
-            <span>Chức năng này đang chờ Backend bổ sung API (Log Batches).</span>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label>Chọn Nguyên liệu</Label>
-              <Select onValueChange={(val) => setFormData({...formData, productId: val})} value={formData.productId}>
+              <Label>Nguyên liệu <span className="text-red-500">*</span></Label>
+              <Select onValueChange={(val) => setFormData({ ...formData, productId: val })} value={formData.productId}>
                 <SelectTrigger>
                   <SelectValue placeholder="-- Chọn nguyên liệu --" />
                 </SelectTrigger>
@@ -103,27 +110,32 @@ export default function Procurement() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label>Số lượng nhập <span className="text-red-500">*</span></Label>
+              <Input type="number" min="0.1" step="0.1" placeholder="0.0" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Mã Lô (Batch ID)</Label>
-                <Input placeholder="VD: BATCH-001" value={formData.batchId} onChange={e => setFormData({...formData, batchId: e.target.value})} />
+                <Label>Ngày nhập kho</Label>
+                <Input type="date" value={formData.productionDate} onChange={e => setFormData({ ...formData, productionDate: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Số lượng</Label>
-                <Input type="number" min="0" step="0.1" placeholder="0.0" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} />
+                <Label>Hạn sử dụng (HSD) <span className="text-red-500">*</span></Label>
+                <Input type="date" value={formData.expiryDate} min={formData.productionDate || today} onChange={e => setFormData({ ...formData, expiryDate: e.target.value })} />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Hạn sử dụng</Label>
-              <div className="relative">
-                <Input type="date" value={formData.expiryDate} onChange={e => setFormData({...formData, expiryDate: e.target.value})} />
-                <CalendarIcon className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-              </div>
+            <div className="bg-green-50 border border-green-200 text-green-800 p-3 rounded-md flex items-start gap-2 text-sm">
+              <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>Lô hàng mua sẽ được tạo với trạng thái <strong>DONE</strong>, hệ thống tự động tạo giao dịch IMPORT và cộng tồn kho.</span>
             </div>
 
-            <Button type="submit" className="w-full">
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Xác nhận Nhập kho'}
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
+                : <><ShoppingCart className="mr-2 h-4 w-4" /> Xác nhận Nhập kho</>
+              }
             </Button>
           </form>
         </CardContent>

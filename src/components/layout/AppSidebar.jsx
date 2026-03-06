@@ -61,12 +61,8 @@ const menuByRole = {
   // Kitchen Manager (Role 4)
   4: [
     { title: 'Bảng điều khiển', url: '/kitchen', icon: LayoutDashboard },
-    { title: 'Sản xuất', url: '/kitchen/production', icon: Factory },
-    { title: 'Tồn kho', url: '/kitchen/inventory', icon: Package },
-    { title: 'Nhập kho', url: '/kitchen/procurement', icon: Warehouse },
-    { title: 'Xuất kho', url: '/kitchen/outbound', icon: Truck },
-    { title: 'Hủy hàng', url: '/kitchen/waste', icon: FileWarning },
-    { title: 'Thẻ kho', url: '/kitchen/stock-card', icon: History },
+    { title: 'Thực thi Sản xuất', url: '/kitchen/production', icon: Factory },
+    { title: 'Nhập mua Nguyên liệu', url: '/kitchen/procurement', icon: Warehouse },
     { title: 'Công thức', url: '/kitchen/recipes', icon: BookOpen },
   ],
   // Supply Coordinator (Role 5)

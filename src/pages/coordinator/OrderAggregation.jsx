@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   fetchOrders,
-  getAllUsers,
+  getAllShippers,
   getAllStores,
   createDelivery,
 } from '../../data/api';
@@ -31,11 +31,11 @@ import { Label } from '../../components/ui/label';
 import { Package, Truck, MapPin, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const SHIPPER_ROLE_ID = 6;
+
 
 export default function OrderAggregation() {
   const [orders, setOrders] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [shippers, setShippers] = useState([]);
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrders, setSelectedOrders] = useState([]);
@@ -47,11 +47,11 @@ export default function OrderAggregation() {
   useEffect(() => {
     Promise.all([
       fetchOrders().catch(() => []),
-      getAllUsers().catch(() => []),
+      getAllShippers().catch(() => []),
       getAllStores().catch(() => []),
-    ]).then(([ordersRes, usersRes, storesRes]) => {
+    ]).then(([ordersRes, shippersRes, storesRes]) => {
       setOrders(Array.isArray(ordersRes) ? ordersRes : []);
-      setUsers(Array.isArray(usersRes) ? usersRes : []);
+      setShippers(Array.isArray(shippersRes) ? shippersRes : []);
       setStores(Array.isArray(storesRes) ? storesRes : []);
     }).finally(() => setLoading(false));
   }, []);
@@ -64,7 +64,7 @@ export default function OrderAggregation() {
       details: (o.order_details || []).map((od) => ({ ...od })),
     }));
 
-  const shippers = users.filter((u) => u.role_id === SHIPPER_ROLE_ID);
+  // shippers is already fetched directly from /users/shippers API
 
   const toggleOrder = (orderId) => {
     setSelectedOrders((prev) =>
