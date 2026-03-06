@@ -40,6 +40,7 @@ export default function Cart() {
   const { items, updateQuantity, removeItem, clearCart, getTotalPrice } = useCart();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateCart = () => {
     for (const item of items) {
