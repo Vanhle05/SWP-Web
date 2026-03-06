@@ -200,7 +200,7 @@ export default function MyTrips() {
               >
                 {isDeliveryStarting
                   ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
-                  : <><Navigation className="mr-2 h-4 w-4" /> Bắt nhận đơn & Giao hàng</>
+                  : <><Navigation className="mr-2 h-4 w-4" /> Nhận và giao</>
                 }
               </Button>
               <Button

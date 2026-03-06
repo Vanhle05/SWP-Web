@@ -39,7 +39,7 @@ export default function Deliveries() {
     const hasDelivering = delivery.orders.some(o => o.status === 'DELIVERING');
     const hasProcessing = delivery.orders.some(o => o.status === 'PROCESSING');
     const allDone = delivery.orders.every(o => o.status === 'DONE');
-    
+
     if (allDone) return 'DONE';
     if (hasDelivering) return 'DELIVERING';
     if (hasProcessing) return 'PROCESSING';
@@ -61,7 +61,7 @@ export default function Deliveries() {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     if (!dateString.includes('+07:00') && !dateString.includes('Z')) {
-       date.setHours(date.getHours() + 7);
+      date.setHours(date.getHours() + 7);
     }
     return date.toLocaleDateString('vi-VN', {
       weekday: 'long',
@@ -89,27 +89,27 @@ export default function Deliveries() {
           </div>
           <StatusBadge status={delivery.status} type="delivery" />
         </div>
-          {delivery.status === 'WAITTING' && (
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mt-2"
-              onClick={async () => {
-                if (!window.confirm('Bạn có chắc muốn hủy chuyến này?')) return;
-                try {
-                  await deleteDelivery(delivery.delivery_id);
-                  toast.success('Đã hủy chuyến thành công!');
-                  // Reload deliveries
-                  getDeliveries()
-                    .then((data) => setDeliveries(Array.isArray(data) ? data : []));
-                } catch (e) {
-                  toast.error(e.message || 'Hủy chuyến thất bại');
-                }
-              }}
-            >
-              Hủy chuyến
-            </Button>
-          )}
+        {delivery.status === 'WAITTING' && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="mt-2"
+            onClick={async () => {
+              if (!window.confirm('Bạn có chắc muốn hủy chuyến này?')) return;
+              try {
+                await deleteDelivery(delivery.delivery_id);
+                toast.success('Đã hủy chuyến thành công!');
+                // Reload deliveries
+                getDeliveries()
+                  .then((data) => setDeliveries(Array.isArray(data) ? data : []));
+              } catch (e) {
+                toast.error(e.message || 'Hủy chuyến thất bại');
+              }
+            }}
+          >
+            Hủy chuyến
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {delivery.shipper && (
