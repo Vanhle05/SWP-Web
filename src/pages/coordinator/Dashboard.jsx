@@ -58,7 +58,7 @@ export default function CoordinatorDashboard() {
     status: calculateDeliveryStatus(d)
   }));
 
-  const waitingOrders = orders.filter((o) => o.status === 'WAITTING');
+  const waitingOrders = orders.filter((o) => o.status === 'WAITTING' && !o.delivery_id);
   const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'PROCESSING' || d.status === 'DELIVERING');
   const today = new Date().toISOString().split('T')[0];
   const todayDeliveries = enrichedDeliveries.filter((d) => (d.delivery_date || d.createdAt || '').startsWith(today));

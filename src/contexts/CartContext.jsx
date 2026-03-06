@@ -13,7 +13,7 @@ export const useCart = () => {
 export const CartProvider = ({ children }) => {
   const [items, setItems] = useState([]);
 
-  const addItem = (product, quantity) => {
+  const addToCart = (product, quantity) => {
     setItems(prev => {
       const existingItem = prev.find(item => item.product_id === product.product_id);
       
@@ -62,7 +62,7 @@ export const CartProvider = ({ children }) => {
 
   const value = {
     items,
-    addItem,
+    addToCart,
     updateQuantity,
     removeItem,
     clearCart,

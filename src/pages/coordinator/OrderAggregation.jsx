@@ -58,6 +58,7 @@ export default function OrderAggregation() {
 
   const waitingOrders = orders
     .filter((o) => o.status === 'WAITTING' && !o.delivery_id)
+    .sort((a, b) => b.order_id - a.order_id)
     .map((o) => ({
       ...o,
       store: stores.find((s) => s.store_id === o.store_id),

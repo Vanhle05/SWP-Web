@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getDeliveries, getAllUsers, getAllStores, deleteDelivery } from '../../data/api';
 import { toast } from '../../components/ui/sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { EmptyState } from '../../components/common/EmptyState';
@@ -50,14 +51,19 @@ export default function Deliveries() {
     orders: d.orders || [],
     shipper: d.shipper_name ? { full_name: d.shipper_name } : null,
     status: calculateDeliveryStatus(d)
-  }));
+  })).sort((a, b) => b.delivery_id - a.delivery_id);
 
   const waitingDeliveries = enrichedDeliveries.filter((d) => d.status === 'WAITTING');
   const processingDeliveries = enrichedDeliveries.filter((d) => d.status === 'PROCESSING' || d.status === 'DELIVERING');
   const doneDeliveries = enrichedDeliveries.filter((d) => d.status === 'DONE');
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    if (!dateString.includes('+07:00') && !dateString.includes('Z')) {
+       date.setHours(date.getHours() + 7);
+    }
+    return date.toLocaleDateString('vi-VN', {
       weekday: 'long',
       day: '2-digit',
       month: '2-digit',

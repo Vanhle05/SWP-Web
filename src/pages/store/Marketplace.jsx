@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getProducts } from '../../data/api';
 import { useCart } from '../../contexts/CartContext';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
@@ -12,7 +13,8 @@ export default function Marketplace() {
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [quantities, setQuantities] = useState({});
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadData = async () => {
@@ -56,11 +58,29 @@ export default function Marketplace() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Đặt hàng</h1>
-        <Badge variant="outline" className="text-sm">
-          {products.length} sản phẩm
-        </Badge>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Đặt hàng</h1>
+          <p className="text-muted-foreground mt-1">Chọn sản phẩm cần nhập cho cửa hàng</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Badge variant="outline" className="text-sm px-3 py-1">
+            {products.length} sản phẩm
+          </Badge>
+          <Button 
+            onClick={() => navigate('/store/cart')}
+            className="relative"
+            variant={items.length > 0 ? 'default' : 'outline'}
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Giỏ hàng
+            {items.length > 0 && (
+              <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold">
+                {items.length}
+              </span>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

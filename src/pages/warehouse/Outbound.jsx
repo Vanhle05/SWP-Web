@@ -28,7 +28,8 @@ export default function WarehouseOutbound() {
     try {
       // Lấy tất cả đơn PROCESSING (đã được gom vào chuyến)
       const orders = await getOrdersByStatus('PROCESSING');
-      setProcessingOrders(Array.isArray(orders) ? orders : []);
+      const sorted = (Array.isArray(orders) ? orders : []).sort((a, b) => b.order_id - a.order_id);
+      setProcessingOrders(sorted);
     } catch (error) {
       // Fallback: lấy tất cả rồi filter
       try {
@@ -173,7 +174,11 @@ export default function WarehouseOutbound() {
                       </CardTitle>
                       <CardDescription>
                         Cửa hàng: {order.store_name} &bull;
-                        Ngày đặt: {order.order_date ? new Date(order.order_date).toLocaleDateString('vi-VN') : 'N/A'}
+                        Ngày đặt: {order.order_date ? (() => {
+                          const d = new Date(order.order_date);
+                          if (!order.order_date.includes('+07:00') && !order.order_date.includes('Z')) d.setHours(d.getHours() + 7);
+                          return d.toLocaleDateString('vi-VN');
+                        })() : 'N/A'}
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">

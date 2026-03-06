@@ -14,7 +14,8 @@ export default function Inventory() {
     setIsLoading(true);
     try {
       const data = await getInventories();
-      setInventories(data || []);
+      const sorted = (data || []).sort((a, b) => b.inventory_id - a.inventory_id);
+      setInventories(sorted);
     } catch (error) {
       toast.error('Không thể tải dữ liệu tồn kho: ' + error.message);
     } finally {
@@ -74,7 +75,11 @@ export default function Inventory() {
                   <div className={`text-xs px-2 py-1 rounded-full w-fit flex items-center gap-1 ${status.color}`}>
                     {status.label === 'Đã hết hạn' && <AlertTriangle className="h-3 w-3" />}
                     {status.label === 'Sắp hết hạn' && <AlertTriangle className="h-3 w-3" />}
-                    <span>HSD: {item.expiry_date ? format(new Date(item.expiry_date), 'dd/MM/yyyy') : 'N/A'}</span>
+                    <span>HSD: {item.expiry_date ? (() => {
+                      const d = new Date(item.expiry_date);
+                      if (!item.expiry_date.includes('+07:00') && !item.expiry_date.includes('Z')) d.setHours(d.getHours() + 7);
+                      return format(d, 'dd/MM/yyyy');
+                    })() : 'N/A'}</span>
                   </div>
                 </div>
               </CardContent>

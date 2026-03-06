@@ -23,7 +23,8 @@ export default function Production() {
     setIsLoading(true);
     try {
       const data = await getProductionPlans();
-      setPlans(Array.isArray(data) ? data : []);
+      const sorted = Array.isArray(data) ? [...data].sort((a, b) => b.planId - a.planId) : [];
+      setPlans(sorted);
     } catch (error) {
       console.warn('Production Plans API error:', error.message);
       toast.error('Không thể tải kế hoạch sản xuất: ' + error.message);
@@ -130,10 +131,18 @@ export default function Production() {
                     <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5" />
-                        Từ: {plan.startDate ? new Date(plan.startDate).toLocaleDateString('vi-VN') : 'N/A'}
+                        Từ: {plan.startDate ? (() => {
+                          const d = new Date(plan.startDate);
+                          if (!plan.startDate.includes('+07:00') && !plan.startDate.includes('Z')) d.setHours(d.getHours() + 7);
+                          return d.toLocaleDateString('vi-VN');
+                        })() : 'N/A'}
                       </span>
                       <span>→</span>
-                      <span>{plan.endDate ? new Date(plan.endDate).toLocaleDateString('vi-VN') : 'N/A'}</span>
+                      <span>{plan.endDate ? (() => {
+                          const d = new Date(plan.endDate);
+                          if (!plan.endDate.includes('+07:00') && !plan.endDate.includes('Z')) d.setHours(d.getHours() + 7);
+                          return d.toLocaleDateString('vi-VN');
+                        })() : 'N/A'}</span>
                     </div>
                     {plan.note && <p className="text-sm text-muted-foreground mt-1">{plan.note}</p>}
                   </div>
