@@ -76,7 +76,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/login" element={<Login />} />
-              
+
               {/* Protected routes */}
               <Route element={<MainLayout />}>
                 {/* Store routes */}
@@ -119,6 +119,7 @@ const App = () => (
                   <Route path="/warehouse" element={<WarehouseDashboard />} />
                   <Route path="/warehouse/inventory" element={<WarehouseInventory />} />
                   <Route path="/warehouse/procurement" element={<WarehouseProcurement />} />
+                  <Route path="/warehouse/inbound" element={<BatchLog status="WAITING_TO_CONFIRM" />} />
                   <Route path="/warehouse/outbound" element={<WarehouseOutbound />} />
                   <Route path="/warehouse/waste" element={<WarehouseWaste />} />
                 </Route>
@@ -137,7 +138,7 @@ const App = () => (
 
               {/* Redirects */}
               <Route path="/" element={<Navigate to="/login" replace />} />
-              
+
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>

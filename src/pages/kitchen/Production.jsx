@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProductionPlans, createProLogBatch, updateLogBatchStatus, getAllLogBatches } from '../../data/api';
+import { getProductionPlans, createProLogBatch, updateLogBatchStatus, getAllLogBatches, getOrdersByStatus, updateOrderStatus } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { ROLE_ID, BATCH_STATUS } from '../../data/constants';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
@@ -55,7 +56,7 @@ export default function Production() {
       toast.error('Vui lòng nhập đủ thông tin');
       return;
     }
-    
+
     const planId = Number(selectedDetail.planId || selectedDetail.plan_id);
     const productId = Number(selectedDetail.productId || selectedDetail.product_id);
 
@@ -73,7 +74,7 @@ export default function Production() {
       product_id: productId,
       quantity: Number(batchForm.quantity),
       productionDate: batchForm.productionDate,
-      expiryDate: null, 
+      expiryDate: null,
       status: 'PROCESSING',
       type: 'PRODUCTION',
     };
@@ -84,6 +85,27 @@ export default function Production() {
     try {
       await createProLogBatch(payload);
       toast.success(`Đã tạo lô sản xuất cho: ${selectedDetail.productName}`);
+
+      // Tự động chuyển trạng thái các đơn hàng WAITTING có chứa sản phẩm này sang PROCESSING
+      try {
+        const waitingOrders = await getOrdersByStatus('WAITTING');
+        const ordersToUpdate = waitingOrders.filter(order =>
+          order.order_details?.some(detail => Number(detail.product_id) === productId)
+        );
+
+        if (ordersToUpdate.length > 0) {
+          await Promise.all(ordersToUpdate.map(order =>
+            updateOrderStatus(order.order_id, 'PROCESSING').catch(err => {
+              console.error(`Failed to update order #${order.order_id}:`, err);
+            })
+          ));
+          toast.info(`Đã chuyển ${ordersToUpdate.length} đơn hàng liên quan sang trạng thái ĐANG XỬ LÝ`);
+        }
+      } catch (orderError) {
+        console.error('Lỗi tự động cập nhật đơn hàng:', orderError);
+        // Không chặn luồng chính nếu lỗi cập nhật đơn hàng
+      }
+
       setDialogOpen(false);
       fetchPlans();
       navigate('/kitchen/batches/PROCESSING');
@@ -170,9 +192,9 @@ export default function Production() {
                               Mục tiêu: <span className="font-bold text-orange-600">{detail.quantity}</span>
                             </p>
                           </div>
-                          <Button 
-                            onClick={() => openDialog(detail, plan.planId)} 
-                            size="sm" 
+                          <Button
+                            onClick={() => openDialog(detail, plan.planId)}
+                            size="sm"
                             className="bg-orange-500 hover:bg-orange-600 shadow-sm"
                           >
                             <Plus className="mr-2 h-4 w-4" /> Tạo Lô Mới
@@ -188,18 +210,19 @@ export default function Production() {
                                   <span className="font-medium text-gray-700">SL: {batch.quantity}</span>
                                   <Badge className={
                                     batch.status === 'PROCESSING' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                                    batch.status === 'WAITING_TO_CONFIRM' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                                    'bg-green-100 text-green-800 border-green-200'
+                                      batch.status === 'WAITING_TO_CONFIRM' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                        batch.status === 'DONE' ? 'bg-green-100 text-green-800 border-green-200' :
+                                          batch.status === 'EXPIRED' || batch.status === 'DAMAGED' ? 'bg-red-100 text-red-800 border-red-200' :
+                                            'bg-gray-100 text-gray-800 border-gray-200'
                                   }>
-                                    {batch.status === 'PROCESSING' ? 'ĐANG NẤU' : 
-                                     batch.status === 'WAITING_TO_CONFIRM' ? 'CHỜ KHO' : 'HOÀN THÀNH'}
+                                    {BATCH_STATUS[batch.status]?.label || batch.status}
                                   </Badge>
                                 </div>
                                 {batch.status === 'PROCESSING' && (
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={() => handleCompleteBatch(batch.batch_id)} 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleCompleteBatch(batch.batch_id)}
                                     className="h-8 text-xs border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800 bg-white"
                                   >
                                     Hoàn thành lô
@@ -230,19 +253,19 @@ export default function Production() {
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label className="font-semibold text-gray-700">Số lượng (đơn vị) *</Label>
-              <Input 
-                type="number" 
+              <Input
+                type="number"
                 placeholder="Nhập số lượng..."
-                value={batchForm.quantity} 
-                onChange={e => setBatchForm({ ...batchForm, quantity: e.target.value })} 
+                value={batchForm.quantity}
+                onChange={e => setBatchForm({ ...batchForm, quantity: e.target.value })}
                 className="focus-visible:ring-orange-500"
               />
             </div>
             <div className="space-y-2">
               <Label className="font-semibold text-gray-700">Ngày sản xuất *</Label>
-              <Input 
-                type="date" 
-                value={batchForm.productionDate} 
+              <Input
+                type="date"
+                value={batchForm.productionDate}
                 onChange={e => setBatchForm({ ...batchForm, productionDate: e.target.value })}
                 className="focus-visible:ring-orange-500 font-medium"
               />

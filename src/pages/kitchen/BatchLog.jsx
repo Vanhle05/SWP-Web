@@ -8,8 +8,9 @@ import { Badge } from '../../components/ui/badge';
 import { Loader2, Package, History, RefreshCw, Clock, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function BatchLog() {
+export default function BatchLog({ status: propStatus }) {
   const { status: urlStatus } = useParams();
+  const effectiveStatus = propStatus || urlStatus;
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +30,7 @@ export default function BatchLog() {
 
   useEffect(() => {
     fetchBatches();
-  }, [urlStatus]);
+  }, [effectiveStatus]);
 
   const getStatusBadge = (status) => {
     const config = BATCH_STATUS[status] || { label: status, color: 'gray', class: 'bg-gray-100 text-gray-800' };
@@ -42,7 +43,7 @@ export default function BatchLog() {
 
   const renderBatchItems = (statusList) => {
     const items = batches.filter(b => statusList.includes(b.status));
-    
+
     if (items.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border border-dashed rounded-xl bg-gray-50/50">
@@ -56,11 +57,10 @@ export default function BatchLog() {
       <div className="grid gap-4">
         {items.map(batch => (
           <Card key={batch.batch_id} className="overflow-hidden border shadow-sm hover:shadow-md transition-shadow">
-            <div className={`h-1.5 w-full ${
-              batch.status === 'DONE' ? 'bg-green-500' : 
-              ['PROCESSING'].includes(batch.status) ? 'bg-blue-500' : 
-              ['WAITING_TO_CANCLE', 'CANCLED', 'EXPIRED', 'DAMAGED'].includes(batch.status) ? 'bg-red-500' : 'bg-yellow-500'
-            }`} />
+            <div className={`h-1.5 w-full ${batch.status === 'DONE' ? 'bg-green-500' :
+              ['PROCESSING'].includes(batch.status) ? 'bg-blue-500' :
+                ['WAITING_TO_CANCLE', 'CANCLED', 'EXPIRED', 'DAMAGED'].includes(batch.status) ? 'bg-red-500' : 'bg-yellow-500'
+              }`} />
             <CardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
@@ -85,27 +85,49 @@ export default function BatchLog() {
                   <span className="text-[10px] text-muted-foreground font-medium uppercase opacity-60">
                     {new Date(batch.created_at).toLocaleDateString('vi-VN')}
                   </span>
-                  
-                  {['PROCESSING', 'WAITING_TO_CONFIRM'].includes(batch.status) && (
-                    <div className="flex gap-2 mt-2">
-                       <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-7 text-[10px] border-red-200 text-red-600 hover:bg-red-50"
-                        onClick={() => handleUpdateStatus(batch.batch_id, 'WAITING_TO_CANCLE')}
+
+                  <div className="flex gap-2 mt-2">
+                    {batch.status === 'PROCESSING' && (
+                      <Button
+                        size="sm"
+                        className="h-7 text-[10px] bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => handleUpdateStatus(batch.batch_id, 'WAITING_TO_CONFIRM')}
                       >
-                        Yêu cầu Hủy
+                        Hoàn thành
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-7 text-[10px] border-orange-200 text-orange-600 hover:bg-orange-50"
-                        onClick={() => handleUpdateStatus(batch.batch_id, 'DAMAGED')}
+                    )}
+
+                    {batch.status === 'WAITING_TO_CONFIRM' && (
+                      <Button
+                        size="sm"
+                        className="h-7 text-[10px] bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => handleUpdateStatus(batch.batch_id, 'DONE')}
                       >
-                        Báo Hỏng
+                        Nhập kho
                       </Button>
-                    </div>
-                  )}
+                    )}
+
+                    {['PROCESSING', 'WAITING_TO_CONFIRM'].includes(batch.status) && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] border-red-200 text-red-600 hover:bg-red-50"
+                          onClick={() => handleUpdateStatus(batch.batch_id, 'WAITING_TO_CANCLE')}
+                        >
+                          Yêu cầu Hủy
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] border-orange-200 text-orange-600 hover:bg-orange-50"
+                          onClick={() => handleUpdateStatus(batch.batch_id, 'DAMAGED')}
+                        >
+                          Báo Hỏng
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -118,9 +140,11 @@ export default function BatchLog() {
   const handleUpdateStatus = async (batchId, newStatus) => {
     const statusLabels = {
       'WAITING_TO_CANCLE': 'Yêu cầu Hủy',
-      'DAMAGED': 'Báo Hỏng'
+      'DAMAGED': 'Báo Hỏng',
+      'DONE': 'Nhập kho',
+      'WAITING_TO_CONFIRM': 'Hoàn thành sản xuất'
     };
-    
+
     if (!confirm(`Xác nhận ${statusLabels[newStatus]} cho lô #${batchId}?`)) return;
 
     try {
@@ -132,18 +156,18 @@ export default function BatchLog() {
     }
   };
 
-  const statusConfig = BATCH_STATUS[urlStatus] || { label: urlStatus };
-  
+  const statusConfig = BATCH_STATUS[effectiveStatus] || { label: effectiveStatus };
+
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex justify-between items-center bg-white p-4 rounded-xl border-l-8 border-l-orange-500 shadow-sm transition-all duration-300">
         <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight flex items-center gap-3 text-orange-600 uppercase">
-                {statusConfig.label}
-              </h1>
-              <p className="text-muted-foreground font-bold text-[10px] uppercase opacity-70 tracking-widest italic">Kitchen Management &raquo; Status &raquo; {urlStatus}</p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight flex items-center gap-3 text-orange-600 uppercase">
+              {statusConfig.label}
+            </h1>
+            <p className="text-muted-foreground font-bold text-[10px] uppercase opacity-70 tracking-widest italic">Management &raquo; Status &raquo; {effectiveStatus}</p>
+          </div>
         </div>
         <Button variant="ghost" size="icon" className="rounded-full hover:bg-orange-50 transition-colors" onClick={fetchBatches} disabled={loading}>
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5 text-orange-600" />}
@@ -153,7 +177,7 @@ export default function BatchLog() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin h-10 w-10 text-orange-600" /></div>
       ) : (
-        renderBatchItems([urlStatus])
+        renderBatchItems([effectiveStatus])
       )}
     </div>
   );

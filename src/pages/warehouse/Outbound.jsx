@@ -34,12 +34,12 @@ export default function WarehouseOutbound() {
       setAllOrders(relevantOrders);
 
       const newOrderReceipts = {};
-      const receiptPromises = relevantOrders.map(o => 
+      const receiptPromises = relevantOrders.map(o =>
         getReceiptsByOrderId(o.order_id).then(res => {
           if (Array.isArray(res)) {
             newOrderReceipts[o.order_id] = res;
           }
-        }).catch(() => {})
+        }).catch(() => { })
       );
 
       await Promise.all(receiptPromises);
@@ -56,7 +56,7 @@ export default function WarehouseOutbound() {
                 if (Array.isArray(fills)) {
                   newFills[detail.order_detail_id] = fills;
                 }
-              }).catch(() => {})
+              }).catch(() => { })
             );
           });
         }
@@ -130,13 +130,22 @@ export default function WarehouseOutbound() {
     setCheckedOrders(prev => ({ ...prev, [orderId]: !prev[orderId] }));
   };
 
+  const handleToggleSelectAll = () => {
+    const allSelected = draftOrders.length > 0 && draftOrders.every(o => !!checkedOrders[o.order_id]);
+    const newChecked = { ...checkedOrders };
+    draftOrders.forEach(o => {
+      newChecked[o.order_id] = !allSelected;
+    });
+    setCheckedOrders(newChecked);
+  };
+
   const getDisplayStatusText = (status, actionType) => {
     if (actionType === 'picking') return 'PROCESSING';
     if (actionType === 'draft') return 'DRAFT';
     if (actionType === 'completed') return 'COMPLETED';
     if (actionType === 'dispatched') {
       if (status === 'DELIVERING') return 'DISPATCHED';
-      return status; 
+      return status;
     }
     return status;
   };
@@ -170,11 +179,11 @@ export default function WarehouseOutbound() {
                   <div className="flex items-start gap-3">
                     {actionType === 'draft' && (
                       <div className="pt-1">
-                        <input 
-                          type="checkbox" 
-                          className="w-5 h-5 accent-yellow-600 rounded cursor-pointer" 
-                          checked={!!checkedOrders[order.order_id]} 
-                          onChange={(e) => toggleOrderChecked(e, order.order_id)} 
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 accent-yellow-600 rounded cursor-pointer"
+                          checked={!!checkedOrders[order.order_id]}
+                          onChange={(e) => toggleOrderChecked(e, order.order_id)}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
@@ -212,10 +221,10 @@ export default function WarehouseOutbound() {
                       </Button>
                     )}
                     {actionType === 'draft' && (
-                      <Button onClick={(e) => { 
-                          e.stopPropagation();
-                          const r = orderReceipts[order.order_id].find(r => r.status === 'DRAFT');
-                          if(r) handleConfirmReceipt(order, r);
+                      <Button onClick={(e) => {
+                        e.stopPropagation();
+                        const r = orderReceipts[order.order_id].find(r => r.status === 'DRAFT');
+                        if (r) handleConfirmReceipt(order, r);
                       }} disabled={isProcessing} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white">
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PackageCheck className="mr-2 h-4 w-4" />}
                         Xác nhận xuất kho
@@ -339,6 +348,20 @@ export default function WarehouseOutbound() {
         </TabsContent>
         <TabsContent value="draft" className="mt-0">
           {renderPickingBatches()}
+
+          {draftOrders.length > 0 && (
+            <div className="flex justify-end mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleSelectAll}
+                className="text-purple-700 border-purple-200 hover:bg-purple-50"
+              >
+                {draftOrders.every(o => !!checkedOrders[o.order_id]) ? 'Bỏ chọn tất cả' : 'Chọn tất cả đơn hàng'}
+              </Button>
+            </div>
+          )}
+
           {renderOrderList(draftOrders, 'draft')}
         </TabsContent>
         <TabsContent value="completed" className="mt-0">{renderOrderList(completedOrders, 'completed')}</TabsContent>

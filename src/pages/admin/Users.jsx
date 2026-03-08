@@ -44,7 +44,7 @@ export default function Users() {
 
   const handleDelete = async (userId) => {
     if (!confirm('Bạn có chắc chắn muốn xóa người dùng này? Hành động này không thể hoàn tác.')) return;
-    
+
     try {
       await deleteUser(userId);
       toast.success('Xóa người dùng thành công');
@@ -105,11 +105,11 @@ export default function Users() {
           <DialogContent>
             <DialogHeader><DialogTitle>Thêm người dùng mới</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <Input placeholder="Tên đăng nhập" value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} />
-              <Input type="password" placeholder="Mật khẩu" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} />
-              <Input placeholder="Họ và tên" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
-              
-              <Select onValueChange={v => setFormData({...formData, roleId: v})} value={formData.roleId}>
+              <Input placeholder="Tên đăng nhập" value={formData.username} onChange={e => setFormData({ ...formData, username: e.target.value })} />
+              <Input type="password" placeholder="Mật khẩu" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+              <Input placeholder="Họ và tên" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
+
+              <Select onValueChange={v => setFormData({ ...formData, roleId: v })} value={formData.roleId}>
                 <SelectTrigger><SelectValue placeholder="Chọn Vai trò" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">Admin</SelectItem>
@@ -123,7 +123,7 @@ export default function Users() {
               </Select>
 
               {Number(formData.roleId) === ROLE_ID.STORE_STAFF && (
-                <Select onValueChange={v => setFormData({...formData, storeId: v})} value={formData.storeId}>
+                <Select onValueChange={v => setFormData({ ...formData, storeId: v })} value={formData.storeId}>
                   <SelectTrigger><SelectValue placeholder="Chọn Cửa hàng" /></SelectTrigger>
                   <SelectContent>
                     {stores.map(s => (

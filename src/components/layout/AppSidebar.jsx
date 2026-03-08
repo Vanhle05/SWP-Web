@@ -40,6 +40,7 @@ import {
   AlertCircle,
   Trash2,
   Timer,
+  ArrowDownToLine,
 } from 'lucide-react';
 
 const menuByRole = {
@@ -85,6 +86,7 @@ const menuByRole = {
     { title: 'Bảng điều khiển', url: '/warehouse', icon: LayoutDashboard },
     { title: 'Tồn kho', url: '/warehouse/inventory', icon: Package },
     { title: 'Nhập mua Nguyên liệu', url: '/warehouse/procurement', icon: ShoppingCart },
+    { title: 'Nhập kho Thành phẩm', url: '/warehouse/inbound', icon: ArrowDownToLine },
     { title: 'Xuất kho', url: '/warehouse/outbound', icon: Truck },
     { title: 'Hủy hàng', url: '/warehouse/waste', icon: FileWarning },
   ],
