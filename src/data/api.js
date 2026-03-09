@@ -168,18 +168,40 @@ function mapUserResponse(u) {
   const roleName = u.roleName ?? u.role?.roleName;
 
   if (!roleId && roleName) {
-    const key = Object.keys(ROLE_NAME_TO_ID).find(k => k.toLowerCase() === roleName.toLowerCase());
-    if (key) roleId = ROLE_NAME_TO_ID[key];
+    const cleanName = String(roleName).trim().toLowerCase();
+    // Exact match
+    const key = Object.keys(ROLE_NAME_TO_ID).find(k => k === cleanName);
+    if (key) {
+      roleId = ROLE_NAME_TO_ID[key];
+    } else {
+      // Fuzzy/Partial match fallbacks
+      if (cleanName.includes('admin')) roleId = ROLE_ID.ADMIN;
+      else if (cleanName.includes('kitchen')) roleId = ROLE_ID.KITCHEN_MANAGER;
+      else if (cleanName.includes('coord')) roleId = ROLE_ID.SUPPLY_COORDINATOR;
+      else if (cleanName.includes('store')) roleId = ROLE_ID.STORE_STAFF;
+      else if (cleanName.includes('shipper')) roleId = ROLE_ID.SHIPPER;
+      else if (cleanName.includes('ship')) roleId = ROLE_ID.SHIPPER;
+      else if (cleanName.includes('warehouse')) roleId = 7;
+      else if (cleanName.includes('manager')) roleId = ROLE_ID.MANAGER;
+    }
   }
 
+  const role = { role_id: roleId, role_name: roleName || 'Unknown' };
+  const store = {
+    store_id: u.storeId ?? u.store?.storeId,
+    store_name: u.storeName ?? u.store?.storeName
+  };
+
   return {
-    user_id: u.userId,
+    user_id: u.userId ?? u.user_id,
     username: u.username,
-    full_name: u.fullName,
+    full_name: u.fullName ?? u.full_name,
     role_name: roleName,
     role_id: roleId,
-    store_id: u.storeId ?? u.store?.storeId,
-    store_name: u.storeName ?? u.store?.storeName,
+    store_id: store.store_id,
+    store_name: store.store_name,
+    role,
+    store
   };
 }
 
@@ -252,106 +274,68 @@ const parseJwt = (token) => {
 
 export const loginUser = async (username, password) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    // Phase 1: Authentication using v2 (OpenAPI: /auth/v2/login)
+    const loginResponse = await fetch(`${API_BASE_URL}/auth/v2/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    if (response.status === 400 || response.status === 401) {
+
+    if (!loginResponse.ok) {
+      if (loginResponse.status === 400 || loginResponse.status === 401) {
+        throw new Error(LOGIN_ERROR_MSG);
+      }
+      throw new Error('Lỗi máy chủ khi đăng nhập.');
+    }
+
+    const loginData = await loginResponse.json();
+    // Expected AuthenticationResponse: { token, authenticated }
+    const token = loginData?.token;
+
+    if (!token || !loginData.authenticated) {
       throw new Error(LOGIN_ERROR_MSG);
     }
-    const data = await handleResponse(response);
-    console.log("API Login Response Raw:", data);
 
-    const responseData = data?.data ?? data;
-    const apiUser = responseData?.user ?? responseData;
-    const token = data?.token ?? responseData?.token ?? apiUser?.token;
+    // Phase 2: Get user details from the token or a separate endpoint
+    // We'll use /auth/introspect or /users/{id} to get the full profile
+    // Standard approach: Decode token for basic info, then fetch full details
+    const decodedToken = parseJwt(token);
+    const userId = decodedToken?.userId || decodedToken?.sub; // Adjust based on actual JWT payload
 
-    if (apiUser && (apiUser.userId != null || apiUser.user_id != null)) {
-      const uid = apiUser.userId ?? apiUser.user_id;
-      let finalUserDetail = apiUser;
-      let rawRoleName = apiUser.roleName ?? apiUser.role_name;
-      let rawRoleId = apiUser.roleId ?? apiUser.role_id;
-      let rawStoreId = apiUser.storeId ?? apiUser.store_id;
-      let rawStoreName = apiUser.storeName ?? apiUser.store_name;
+    if (!userId) {
+      console.error("JWT Payload lacks userId or sub:", decodedToken);
+      throw new Error('Token không hợp lệ (thiếu thông tin người dùng).');
+    }
 
-      if (!rawRoleName && !rawRoleId) {
-        try {
-          console.log(`[Login Fix] Fetching details for User ID: ${uid}`);
-          const detailResponse = await fetch(`${API_BASE_URL}/users/${uid}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            }
-          });
+    console.log(`[Auth Phase 2] Fetching user details for ID: ${userId}`);
 
-          if (detailResponse.ok) {
-            const detailData = await detailResponse.json();
-            const userResp = detailData?.data ?? detailData;
-            console.log("[Login Fix] User Detail Response:", userResp);
-
-            if (userResp) {
-              finalUserDetail = { ...apiUser, ...userResp };
-              rawRoleName = userResp.roleName;
-              rawStoreId = userResp.storeId;
-              rawStoreName = userResp.storeName;
-            }
-          }
-        } catch (err) {
-          console.error("[Login Fix] Failed to fetch user details:", err);
-        }
+    const detailResponse = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
       }
+    });
 
-      if (!rawRoleId && rawRoleName) {
-        const cleanName = String(rawRoleName).trim().toLowerCase();
-        const mappedKey = Object.keys(ROLE_NAME_TO_ID).find(k => k === cleanName);
-        if (mappedKey) {
-          rawRoleId = ROLE_NAME_TO_ID[mappedKey];
-        } else {
-          console.warn(`[Login Fix] Role name '${cleanName}' không khớp chính xác. Đang thử tìm kiếm mờ...`);
-          if (cleanName.includes('kitchen')) {
-            rawRoleId = ROLE_ID.KITCHEN_MANAGER;
-          } else if (cleanName.includes('coord')) {
-            rawRoleId = ROLE_ID.SUPPLY_COORDINATOR;
-          } else if (cleanName.includes('store')) {
-            rawRoleId = ROLE_ID.STORE_STAFF;
-          } else if (cleanName.includes('ship')) {
-            rawRoleId = ROLE_ID.SHIPPER;
-          } else if (cleanName.includes('admin')) {
-            rawRoleId = ROLE_ID.ADMIN;
-          } else if (cleanName.includes('warehouse')) {
-            rawRoleId = 7;
-          } else if (cleanName.includes('manager')) {
-            rawRoleId = ROLE_ID.MANAGER;
-          }
-        }
-      }
+    if (!detailResponse.ok) {
+      throw new Error('Không thể lấy thông tin chi tiết người dùng.');
+    }
 
-      const role = { role_id: rawRoleId, role_name: rawRoleName || 'Unknown' };
-      const store = { store_id: rawStoreId, store_name: rawStoreName };
+    const userData = await detailResponse.json();
+    console.log("[Auth Phase 2] User Details Raw:", userData);
+    const u = userData?.data ?? userData;
 
-      const mappedUser = {
-        user_id: uid,
-        username: finalUserDetail.username,
-        full_name: finalUserDetail.fullName ?? finalUserDetail.full_name,
-        role_id: rawRoleId ?? null,
-        store_id: rawStoreId ?? null,
-        role,
-        store,
-        token: token,
-      };
-
-      console.log("Final Mapped User:", mappedUser);
+    // Use the mapper to ensure consistent structure
+    const mappedUser = mapUserResponse(u);
+    if (mappedUser) {
+      mappedUser.token = token; // Inject token for subsequent requests
       return { user: mappedUser, token: token };
     }
-    return data;
+
+    throw new Error('Dữ liệu người dùng từ API không hợp lệ.');
   } catch (error) {
     console.error("Lỗi đăng nhập:", error);
-    if (error instanceof Error && error.message && !error.message.startsWith('Failed to fetch') && !error.message.includes('NetworkError')) {
-      throw error;
-    }
-    throw new Error('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+    throw error;
   }
 };
 
@@ -771,6 +755,17 @@ export const createProductionPlan = async (planData) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(planData),
+  });
+  return await handleResponse(response);
+};
+
+export const updateProductionPlanStatus = async (planId, status) => {
+  const params = new URLSearchParams();
+  params.append('planId', planId);
+  params.append('status', status);
+  const response = await authFetch(`${API_BASE_URL}/production-plans/update-status?${params.toString()}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
   });
   return await handleResponse(response);
 };

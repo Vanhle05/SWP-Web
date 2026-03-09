@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getOrdersByStatus, getOrderDetailFillsByOrderDetailId, getReceiptsByOrderId, createReceipt, confirmReceipt, updateOrderStatus } from '../../data/api';
+import { getOrdersByStatus, getOrderDetailFillsByOrderDetailId, getReceiptsByOrderId, createReceipt, confirmReceipt, confirmReceipts, updateOrderStatus, completeOrder } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
@@ -21,15 +21,17 @@ export default function WarehouseOutbound() {
     setIsLoading(true);
     setCheckedOrders({});
     try {
-      const [pOrders, delOrders, doneOrders, damagedOrders, canceledOrders] = await Promise.all([
+      const [pOrders, wOrders, dispOrders, delOrders, doneOrders, damagedOrders, canceledOrders] = await Promise.all([
         getOrdersByStatus('PROCESSING').catch(() => []),
+        getOrdersByStatus('WAITTING').catch(() => []),
+        getOrdersByStatus('DISPATCHED').catch(() => []),
         getOrdersByStatus('DELIVERING').catch(() => []),
         getOrdersByStatus('DONE').catch(() => []),
         getOrdersByStatus('DAMAGED').catch(() => []),
         getOrdersByStatus('CANCLED').catch(() => []),
       ]);
 
-      const relevantOrders = [...pOrders, ...delOrders, ...doneOrders, ...damagedOrders, ...canceledOrders]
+      const relevantOrders = [...pOrders, ...wOrders, ...dispOrders, ...delOrders, ...doneOrders, ...damagedOrders, ...canceledOrders]
         .sort((a, b) => b.order_id - a.order_id);
       setAllOrders(relevantOrders);
 
@@ -111,15 +113,58 @@ export default function WarehouseOutbound() {
     }
   };
 
-  const handleDispatchOrder = async (order) => {
-    if (!confirm(`Đánh dấu đơn hàng #${order.order_id} đã ĐIỀU PHỐI (DISPATCHED)?\nShipper sẽ thấy đơn hàng này để Nhận và Giao.`)) return;
-    setProcessingOrderId(order.order_id);
+  const handleConfirmReceipts = async () => {
+    const selectedIds = Object.keys(checkedOrders)
+      .filter(id => checkedOrders[id])
+      .map(id => {
+        const r = (orderReceipts[id] || []).find(receipt => receipt.status === 'DRAFT');
+        return r ? r.receipt_id : null;
+      })
+      .filter(Boolean);
+
+    if (selectedIds.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một đơn có Phiếu Draft');
+      return;
+    }
+
+    if (!confirm(`Xác nhận Xuất kho cho ${selectedIds.length} phiếu đã chọn?`)) return;
+
+    setIsLoading(true);
     try {
-      await updateOrderStatus(order.order_id, 'DELIVERING');
-      toast.success('Đơn hàng đã được xuất kho và chuyển cho Shipper (DELIVERING).');
+      await confirmReceipts(selectedIds);
+      toast.success(`Đã xác nhận xuất kho thành công cho ${selectedIds.length} phiếu.`);
+      setCheckedOrders({});
       await fetchData();
     } catch (error) {
-      toast.error('Lỗi điều phối đơn hàng: ' + error.message);
+      toast.error('Lỗi xác nhận xuất kho hàng loạt: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDispatchOrder = async (order) => {
+    if (!confirm(`Đánh dấu đơn hàng #${order.order_id} SẴN SÀNG BÀN GIAO?\nShipper sẽ thấy đơn hàng này để Nhận và Giao.`)) return;
+    setProcessingOrderId(order.order_id);
+    try {
+      await updateOrderStatus(order.order_id, 'DISPATCHED');
+      toast.success('Đơn hàng đã sẵn sàng bàn giao cho Shipper.');
+      await fetchData();
+    } catch (error) {
+      toast.error('Lỗi cập nhật: ' + error.message);
+    } finally {
+      setProcessingOrderId(null);
+    }
+  };
+
+  const handleCompleteOrder = async (order) => {
+    if (!confirm(`Xác nhận HOÀN TẤT XUẤT KHO cho đơn #${order.order_id}?\nĐơn hàng sẽ được chuyển vào mục Lịch sử.`)) return;
+    setProcessingOrderId(order.order_id);
+    try {
+      await completeOrder(order.order_id);
+      toast.success('Xuất kho hoàn tất thành công!');
+      await fetchData();
+    } catch (error) {
+      toast.error('Lỗi hoàn tất xuất kho: ' + error.message);
     } finally {
       setProcessingOrderId(null);
     }
@@ -144,17 +189,31 @@ export default function WarehouseOutbound() {
     if (actionType === 'draft') return 'DRAFT';
     if (actionType === 'completed') return 'COMPLETED';
     if (actionType === 'dispatched') {
-      if (status === 'DELIVERING') return 'DISPATCHED';
       return status;
     }
     return status;
   };
 
   // derived data
-  const pickingOrders = allOrders.filter(o => o.status === 'PROCESSING' && !(orderReceipts[o.order_id] || []).length);
-  const draftOrders = allOrders.filter(o => o.status === 'PROCESSING' && (orderReceipts[o.order_id] || []).some(r => r.status === 'DRAFT') && !(orderReceipts[o.order_id] || []).some(r => r.status === 'COMPLETED'));
-  const completedOrders = allOrders.filter(o => o.status === 'PROCESSING' && (orderReceipts[o.order_id] || []).some(r => r.status === 'COMPLETED'));
-  const dispatchedOrders = allOrders.filter(o => ['DELIVERING', 'DONE', 'DAMAGED', 'CANCLED'].includes(o.status));
+  const pickingOrders = allOrders.filter(o =>
+    (o.status === 'PROCESSING' || (o.status === 'WAITTING' && o.delivery_id)) &&
+    (!orderReceipts[o.order_id] || orderReceipts[o.order_id].length === 0)
+  );
+
+  const draftOrders = allOrders.filter(o =>
+    (o.status === 'PROCESSING' || o.status === 'WAITTING') &&
+    (orderReceipts[o.order_id] || []).some(r => r.status === 'DRAFT')
+  );
+
+  const dispatchedOrders = allOrders.filter(o =>
+    (o.status === 'DISPATCHED' || o.status === 'DELIVERING' || o.status === 'PROCESSING' || o.status === 'WAITTING') &&
+    (orderReceipts[o.order_id] || []).length > 0 &&
+    (orderReceipts[o.order_id] || []).every(r => r.status === 'COMPLETED')
+  );
+
+  const historyOrders = allOrders.filter(o =>
+    ['DONE', 'DAMAGED', 'CANCLED'].includes(o.status)
+  );
 
   const renderOrderList = (orders, actionType) => {
     if (orders.length === 0) {
@@ -231,10 +290,30 @@ export default function WarehouseOutbound() {
                       </Button>
                     )}
                     {actionType === 'completed' && (
-                      <Button onClick={(e) => { e.stopPropagation(); handleDispatchOrder(order); }} disabled={isProcessing} className="w-full bg-green-600 hover:bg-green-700">
-                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        Hoàn tất Xuất kho
-                      </Button>
+                      <>
+                        {(order.status === 'PROCESSING' || order.status === 'WAITTING') && (
+                          <Button onClick={(e) => { e.stopPropagation(); handleDispatchOrder(order); }} disabled={isProcessing} className="w-full bg-blue-600 hover:bg-blue-700">
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Truck className="mr-2 h-4 w-4" />}
+                            Bàn giao cho Shipper
+                          </Button>
+                        )}
+                        {order.status === 'DISPATCHED' && (
+                          <div className="w-full p-2.5 bg-yellow-50 text-yellow-700 text-sm text-center rounded border border-yellow-200 flex items-center justify-center gap-2 font-bold italic">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Chờ Shipper "Nhận và giao"
+                          </div>
+                        )}
+                        {order.status === 'DELIVERING' && (
+                          <Button onClick={(e) => { e.stopPropagation(); handleCompleteOrder(order); }} disabled={isProcessing} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold shadow-md">
+                            {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                            Xác nhận hoàn tất xuất kho
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {actionType === 'history' && (
+                      <div className="w-full p-2 bg-slate-50 text-slate-600 text-xs text-center rounded border border-slate-200 flex items-center justify-center gap-2 font-medium">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" /> Đã hoàn tất thủ tục xuất kho
+                      </div>
                     )}
                     {actionType === 'dispatched' && (
                       <div className="w-full p-2 bg-blue-50 text-blue-700 text-xs text-center rounded border border-blue-200 flex items-center justify-center gap-2 font-medium">
@@ -328,18 +407,18 @@ export default function WarehouseOutbound() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 w-full md:w-auto h-auto min-h-[40px] mb-6 p-1 bg-slate-100 rounded-lg">
+        <TabsList className="grid grid-cols-4 w-fit h-auto min-h-[40px] mb-6 p-1 bg-slate-100 rounded-lg">
           <TabsTrigger value="picking" className="py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             1. Soạn hàng {pickingOrders.length > 0 && <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-700">{pickingOrders.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="draft" className="py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
             2. Draft {draftOrders.length > 0 && <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-700">{draftOrders.length}</Badge>}
           </TabsTrigger>
-          <TabsTrigger value="completed" className="py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            3. Completed {completedOrders.length > 0 && <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">{completedOrders.length}</Badge>}
-          </TabsTrigger>
           <TabsTrigger value="dispatched" className="py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            4. Dispatched {dispatchedOrders.length > 0 && <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">{dispatchedOrders.length}</Badge>}
+            3. Xuất kho {dispatchedOrders.length > 0 && <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">{dispatchedOrders.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="history" className="py-2.5 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            4. Lịch sử {historyOrders.length > 0 && <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-700">{historyOrders.length}</Badge>}
           </TabsTrigger>
         </TabsList>
 
@@ -350,22 +429,36 @@ export default function WarehouseOutbound() {
           {renderPickingBatches()}
 
           {draftOrders.length > 0 && (
-            <div className="flex justify-end mb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleToggleSelectAll}
-                className="text-purple-700 border-purple-200 hover:bg-purple-50"
-              >
-                {draftOrders.every(o => !!checkedOrders[o.order_id]) ? 'Bỏ chọn tất cả' : 'Chọn tất cả đơn hàng'}
-              </Button>
+            <div className="flex justify-between items-center mb-4">
+              <div className="text-sm text-muted-foreground italic">
+                {Object.values(checkedOrders).filter(Boolean).length} đơn đã chọn
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToggleSelectAll}
+                  className="text-purple-700 border-purple-200 hover:bg-purple-50"
+                >
+                  {draftOrders.every(o => !!checkedOrders[o.order_id]) ? 'Bỏ chọn tất cả' : 'Chọn tất cả đơn hàng'}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleConfirmReceipts}
+                  disabled={isLoading || Object.values(checkedOrders).filter(Boolean).length === 0}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  <PackageCheck className="mr-2 h-4 w-4" />
+                  Xác nhận xuất kho hàng loạt
+                </Button>
+              </div>
             </div>
           )}
 
           {renderOrderList(draftOrders, 'draft')}
         </TabsContent>
-        <TabsContent value="completed" className="mt-0">{renderOrderList(completedOrders, 'completed')}</TabsContent>
-        <TabsContent value="dispatched" className="mt-0">{renderOrderList(dispatchedOrders, 'dispatched')}</TabsContent>
+        <TabsContent value="dispatched" className="mt-0">{renderOrderList(dispatchedOrders, 'completed')}</TabsContent>
+        <TabsContent value="history" className="mt-0">{renderOrderList(historyOrders, 'history')}</TabsContent>
       </Tabs>
     </div>
   );

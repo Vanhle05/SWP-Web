@@ -27,19 +27,38 @@ import { toast } from 'sonner';
 export default function MyTrips() {
   const { user } = useAuth();
   const [deliveries, setDeliveries] = useState([]);
+  const [orderReceipts, setOrderReceipts] = useState({}); // { orderId: [receipts] }
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isStarting, setIsStarting] = useState(null);
 
-  const reloadData = () => {
+  const reloadData = async () => {
     if (!user?.user_id) { setLoading(false); return; }
     setLoading(true);
-    getDeliveriesByShipperId(user.user_id)
-      .then(data => setDeliveries(Array.isArray(data) ? data : []))
-      .catch(() => setDeliveries([]))
-      .finally(() => setLoading(false));
+    try {
+      const data = await getDeliveriesByShipperId(user.user_id);
+      const deliveryList = Array.isArray(data) ? data : [];
+      setDeliveries(deliveryList);
+
+      // Fetch receipts for all orders in these deliveries
+      const orderIds = [...new Set(deliveryList.flatMap(d => (d.orders || []).map(o => o.order_id)))];
+      const receiptsData = {};
+      await Promise.all(orderIds.map(async (id) => {
+        try {
+          const res = await getReceiptsByOrderId(id);
+          receiptsData[id] = Array.isArray(res) ? res : [];
+        } catch (e) {
+          receiptsData[id] = [];
+        }
+      }));
+      setOrderReceipts(receiptsData);
+    } catch (error) {
+      setDeliveries([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { reloadData(); }, [user?.user_id]);
@@ -59,10 +78,14 @@ export default function MyTrips() {
   const handleStartDelivery = async (deliveryId, orders) => {
     setIsStarting(deliveryId);
     try {
-      // Check if ALL orders are DELIVERING
-      const nonDispatched = orders.filter(o => o.status !== 'DELIVERING');
-      if (nonDispatched.length > 0) {
-        toast.error(`Có đơn hàng chưa được Kho điều phối xuất kho. Vui lòng chờ Kho Hoàn tất Xuất kho trước.`);
+      // Check if ALL orders are DISPATCHED and have COMPLETED receipts
+      const readyOrders = orders.filter(o => {
+        const hasCompletedReceipt = (orderReceipts[o.order_id] || []).some(r => r.status === 'COMPLETED');
+        return o.status === 'DISPATCHED' && hasCompletedReceipt;
+      });
+
+      if (readyOrders.length < orders.length) {
+        toast.error(`Có đơn hàng chưa được Kho xuất hàng (COMPLETED & DISPATCHED). Vui lòng chờ Kho Hoàn tất Xuất kho trước.`);
         setIsStarting(null);
         return;
       }
@@ -155,7 +178,7 @@ export default function MyTrips() {
                       Hoàn thành
                     </Button>
                   )}
-                  {(order.status === 'DONE' || order.status === 'DAMAGED') && (
+                  {(order.status === 'DONE' || order.status === 'DAMAGED' || order.status === 'DISPATCHED') && (
                     <StatusBadge status={order.status} type="order" />
                   )}
                 </div>
@@ -175,17 +198,21 @@ export default function MyTrips() {
           </div>
 
           {showActions && deliveryStatus === 'WAITTING' && (() => {
-            const allDispatched = (delivery.orders || []).every(o => o.status === 'DELIVERING');
+            const allReady = (delivery.orders || []).every(o => {
+              const receipts = orderReceipts[o.order_id] || [];
+              return o.status === 'DISPATCHED' && receipts.some(r => r.status === 'COMPLETED');
+            });
+
             return (
               <div className="flex justify-center mt-4">
                 <Button
                   className="w-full sm:w-1/2 bg-blue-600 hover:bg-blue-700"
                   onClick={() => handleStartDelivery(delivery.delivery_id, delivery.orders)}
-                  disabled={isDeliveryStarting || !allDispatched}
+                  disabled={isDeliveryStarting || !allReady}
                 >
                   {isDeliveryStarting
                     ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang xử lý...</>
-                    : !allDispatched 
+                    : !allReady
                       ? <><Navigation className="mr-2 h-4 w-4 opacity-50" /> Chờ kho xuất hàng</>
                       : <><Navigation className="mr-2 h-4 w-4" /> Nhận và giao</>
                   }

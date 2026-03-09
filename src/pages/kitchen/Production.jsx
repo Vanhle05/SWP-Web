@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProductionPlans, createProLogBatch, updateLogBatchStatus, getAllLogBatches, getOrdersByStatus, updateOrderStatus } from '../../data/api';
+import { getProductionPlans, createProLogBatch, updateLogBatchStatus, getAllLogBatches, getOrdersByStatus, updateOrderStatus, updateProductionPlanStatus } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -17,7 +17,7 @@ export default function Production() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDetail, setSelectedDetail] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [batchForm, setBatchForm] = useState({ quantity: '', productionDate: '' });
+  const [batchForm, setBatchForm] = useState({ quantity_batches: '1', productionDate: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
@@ -47,44 +47,45 @@ export default function Production() {
 
   const openDialog = (detail, planId) => {
     setSelectedDetail({ ...detail, planId });
-    setBatchForm({ quantity: '', productionDate: today });
+    setBatchForm({ quantity_batches: '1', productionDate: today });
     setDialogOpen(true);
   };
 
   const handleCreateBatch = async () => {
-    if (!batchForm.quantity || !batchForm.productionDate) {
+    if (!batchForm.quantity_batches || !batchForm.productionDate) {
       toast.error('Vui lòng nhập đủ thông tin');
       return;
     }
 
     const planId = Number(selectedDetail.planId || selectedDetail.plan_id);
     const productId = Number(selectedDetail.productId || selectedDetail.product_id);
+    const targetQty = Number(selectedDetail.quantity);
+    const numBatches = Number(batchForm.quantity_batches);
 
-    if (isNaN(planId) || isNaN(productId) || Number(batchForm.quantity) <= 0) {
-      console.error('Validation failed:', { planId, productId, quantity: batchForm.quantity });
+    if (isNaN(planId) || isNaN(productId) || numBatches <= 0) {
       toast.error('Vui lòng nhập số lượng hợp lệ');
       return;
     }
 
-    // Comprehensive payload to handle various backend expectations
+    // Logic: 1 batch = 1 lot of target quantity
+    const totalQuantity = numBatches * targetQty;
+
     const payload = {
       planId: planId,
       productId: productId,
       plan_id: planId,
       product_id: productId,
-      quantity: Number(batchForm.quantity),
+      quantity: totalQuantity,
       productionDate: batchForm.productionDate,
       expiryDate: null,
       status: 'PROCESSING',
       type: 'PRODUCTION',
     };
 
-    console.log('Final creation payload:', payload);
-
     setIsSubmitting(true);
     try {
       await createProLogBatch(payload);
-      toast.success(`Đã tạo lô sản xuất cho: ${selectedDetail.productName}`);
+      toast.success(`Đã tạo lô sản xuất (${numBatches} lô = ${totalQuantity} SP) cho: ${selectedDetail.productName}`);
 
       // Tự động chuyển trạng thái các đơn hàng WAITTING có chứa sản phẩm này sang PROCESSING
       try {
@@ -99,11 +100,9 @@ export default function Production() {
               console.error(`Failed to update order #${order.order_id}:`, err);
             })
           ));
-          toast.info(`Đã chuyển ${ordersToUpdate.length} đơn hàng liên quan sang trạng thái ĐANG XỬ LÝ`);
         }
       } catch (orderError) {
         console.error('Lỗi tự động cập nhật đơn hàng:', orderError);
-        // Không chặn luồng chính nếu lỗi cập nhật đơn hàng
       }
 
       setDialogOpen(false);
@@ -116,10 +115,71 @@ export default function Production() {
     }
   };
 
+  const getCalculatedPlanStatus = (plan, planBatches) => {
+    const apiStatus = String(plan.status || '').toUpperCase();
+    if (apiStatus === 'DONE') return 'DONE';
+
+    const pDetails = plan.details || plan.productionPlanDetails || [];
+    if (pDetails.length === 0) return plan.status || 'PROCESSING';
+
+    const terminalStatuses = ['DONE', 'DAMAGED', 'CANCLED', 'EXPIRED', 'WAITING_TO_CONFIRM', 'WAITING_TO_CANCLE'];
+
+    const currentPlanId = Number(plan.planId || plan.plan_id);
+    const planBatchesForThisPlan = planBatches.filter(b => Number(b.planId || b.plan_id) === currentPlanId);
+
+    if (planBatchesForThisPlan.length === 0) return plan.status || 'PROCESSING';
+
+    const allBatchesFinished = planBatchesForThisPlan.every(b => {
+      const s = String(b.status || '').toUpperCase();
+      return terminalStatuses.includes(s);
+    });
+
+    const allProductsStarted = pDetails.every(detail => {
+      const dpid = Number(detail.productId || detail.product_id);
+      return planBatchesForThisPlan.some(b => Number(b.productId || b.product_id || b.product_id) === dpid);
+    });
+
+    if (allBatchesFinished && allProductsStarted) return 'DONE';
+    return plan.status || 'PROCESSING';
+  };
+
+  const checkAndUpdatePlanStatus = async (planId) => {
+    try {
+      const [allPlans, allBatches] = await Promise.all([
+        getProductionPlans(),
+        getAllLogBatches()
+      ]);
+
+      let plan = allPlans.find(p => p.planId === planId);
+      if (!plan || plan.status === 'DONE') return;
+
+      const calcStatus = getCalculatedPlanStatus(plan, allBatches);
+
+      if (calcStatus === 'DONE') {
+        try {
+          await updateProductionPlanStatus(planId, 'DONE');
+          toast.info(`Kế hoạch #${planId} đã hoàn tất và chuyển sang trạng thái DONE!`);
+        } catch (updateErr) {
+          console.error('API update status failed, but UI will show DONE:', updateErr);
+        }
+        await fetchPlans();
+      }
+    } catch (error) {
+      console.error('Error checking plan status:', error);
+    }
+  };
+
   const handleCompleteBatch = async (batchId) => {
     try {
       await updateLogBatchStatus(batchId, 'WAITING_TO_CONFIRM');
       toast.success('Đã hoàn thành lô! Đang chờ Kho xác nhận nhập kho.');
+
+      // Find which plan this batch belongs to and check if plan should be DONE
+      const batch = batches.find(b => b.batch_id === batchId);
+      if (batch && (batch.planId || batch.plan_id)) {
+        await checkAndUpdatePlanStatus(batch.planId || batch.plan_id);
+      }
+
       fetchPlans();
     } catch (error) {
       toast.error('Lỗi cập nhật lô: ' + error.message);
@@ -128,9 +188,10 @@ export default function Production() {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'DONE': return 'bg-green-100 text-green-800';
+      case 'PROCESSING': return 'bg-blue-100 text-blue-800';
       case 'ACTIVE': return 'bg-green-100 text-green-800';
       case 'PENDING': return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -145,10 +206,10 @@ export default function Production() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Thực thi Sản xuất</h1>
-          <p className="text-muted-foreground font-medium">Theo dõi kế hoạch và tạo lô sản phẩm</p>
+          <h1 className="text-3xl font-bold tracking-tight text-orange-600">Thực thi Sản xuất</h1>
+          <p className="text-muted-foreground font-medium italic">Theo dõi kế hoạch và nấu theo lô sản phẩm</p>
         </div>
-        <Button variant="outline" onClick={fetchPlans} disabled={isLoading}>
+        <Button variant="outline" onClick={fetchPlans} disabled={isLoading} className="border-orange-200 text-orange-700 hover:bg-orange-50">
           <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           Làm mới
         </Button>
@@ -163,19 +224,21 @@ export default function Production() {
         ) : (
           plans.map(plan => (
             <Card key={plan.planId} className="border-l-4 border-l-orange-500 shadow-sm overflow-hidden">
-              <CardHeader className="bg-orange-50/30">
+              <CardHeader className="bg-orange-50/50 py-4 border-b">
                 <div className="flex justify-between items-center">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg">Kế hoạch #{plan.planId}</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      Kế hoạch #{plan.planId}
+                    </CardTitle>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1 font-medium italic">
+                      <span className="flex items-center gap-1 font-medium bg-white px-2 py-0.5 rounded-full border">
                         <Calendar className="h-3 w-3" />
                         {plan.startDate ? new Date(plan.startDate).toLocaleDateString('vi-VN') : 'N/A'} - {plan.endDate ? new Date(plan.endDate).toLocaleDateString('vi-VN') : 'N/A'}
                       </span>
                     </div>
                   </div>
-                  <Badge className={getStatusColor(plan.status)}>
-                    {plan.status}
+                  <Badge className={getStatusColor(getCalculatedPlanStatus(plan, batches))}>
+                    {getCalculatedPlanStatus(plan, batches)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -184,30 +247,36 @@ export default function Production() {
                   {(plan.details || []).map(detail => {
                     const detailBatches = batches.filter(b => b.planId === plan.planId && b.product_id === detail.productId);
                     return (
-                      <div key={detail.planDetailId} className="p-4 bg-white hover:bg-orange-50/10 transition-colors">
+                      <div key={detail.planDetailId} className="p-4 bg-white hover:bg-orange-50/5 transition-colors">
                         <div className="flex items-center justify-between mb-4">
                           <div className="space-y-1">
-                            <p className="font-bold text-gray-800">{detail.productName}</p>
+                            <p className="font-bold text-gray-800 text-base">{detail.productName}</p>
                             <p className="text-sm">
-                              Mục tiêu: <span className="font-bold text-orange-600">{detail.quantity}</span>
+                              Mục tiêu sản xuất: <span className="font-bold text-orange-600 underline">{detail.quantity}</span> SP
                             </p>
                           </div>
-                          <Button
-                            onClick={() => openDialog(detail, plan.planId)}
-                            size="sm"
-                            className="bg-orange-500 hover:bg-orange-600 shadow-sm"
-                          >
-                            <Plus className="mr-2 h-4 w-4" /> Tạo Lô Mới
-                          </Button>
+                          {getCalculatedPlanStatus(plan, batches) !== 'DONE' ? (
+                            <Button
+                              onClick={() => openDialog(detail, plan.planId)}
+                              size="sm"
+                              className="bg-orange-500 hover:bg-orange-600 shadow-sm font-bold"
+                            >
+                              <Plus className="mr-2 h-4 w-4" /> Bắt đầu sản xuất
+                            </Button>
+                          ) : (
+                            <div className="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full border border-green-200 text-sm">
+                              <CheckSquare className="h-4 w-4" /> Sản xuất hoàn tất
+                            </div>
+                          )}
                         </div>
 
                         {detailBatches.length > 0 && (
-                          <div className="space-y-2 mt-2">
+                          <div className="space-y-2 mt-2 pl-2 border-l-2 border-orange-100">
                             {detailBatches.map(batch => (
-                              <div key={batch.batch_id} className="flex items-center justify-between bg-gray-50 p-2.5 rounded-lg border text-sm">
+                              <div key={batch.batch_id} className="flex items-center justify-between bg-gray-50/50 p-2.5 rounded-lg border border-dashed text-sm">
                                 <div className="flex items-center gap-3">
-                                  <Badge variant="secondary" className="font-mono bg-white border tracking-tighter">#{batch.batch_id}</Badge>
-                                  <span className="font-medium text-gray-700">SL: {batch.quantity}</span>
+                                  <Badge variant="secondary" className="font-mono bg-white border tracking-tighter shadow-sm text-gray-500">#{batch.batch_id}</Badge>
+                                  <span className="font-bold text-gray-700">SL: {batch.quantity}</span>
                                   <Badge className={
                                     batch.status === 'PROCESSING' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                                       batch.status === 'WAITING_TO_CONFIRM' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
@@ -223,9 +292,9 @@ export default function Production() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleCompleteBatch(batch.batch_id)}
-                                    className="h-8 text-xs border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800 bg-white"
+                                    className="h-8 text-xs border-orange-300 text-orange-700 hover:bg-orange-50 hover:text-orange-800 bg-white shadow-sm font-semibold"
                                   >
-                                    Hoàn thành lô
+                                    Hoàn thành
                                   </Button>
                                 )}
                               </div>
@@ -245,24 +314,36 @@ export default function Production() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-orange-600">Bắt đầu lô sản xuất</DialogTitle>
-            <DialogDescription className="font-medium">
-              Sản phẩm: <span className="text-foreground">{selectedDetail?.productName}</span>
+            <DialogTitle className="text-xl font-bold text-orange-600">Bắt đầu sản xuất</DialogTitle>
+            <DialogDescription className="font-medium text-gray-500 italic">
+              Sản phẩm: <span className="text-foreground not-italic font-bold">{selectedDetail?.productName}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label className="font-semibold text-gray-700">Số lượng (đơn vị) *</Label>
+              <div className="flex justify-between items-center">
+                <Label className="font-bold text-gray-700">Số lượng lô (Lot count) *</Label>
+                <span className="text-xs text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded border">
+                  1 lô = {selectedDetail?.quantity} SP
+                </span>
+              </div>
               <Input
                 type="number"
-                placeholder="Nhập số lượng..."
-                value={batchForm.quantity}
-                onChange={e => setBatchForm({ ...batchForm, quantity: e.target.value })}
-                className="focus-visible:ring-orange-500"
+                min="0.1"
+                step="0.1"
+                placeholder="Nhập số lô (VD: 1, 2...)"
+                value={batchForm.quantity_batches}
+                onChange={e => setBatchForm({ ...batchForm, quantity_batches: e.target.value })}
+                className="focus-visible:ring-orange-500 font-bold text-lg h-12"
               />
+              <div className="flex justify-end pt-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Tổng sản phẩm dự kiến: <span className="text-orange-600 font-bold">{(Number(batchForm.quantity_batches || 0) * Number(selectedDetail?.quantity || 0)).toFixed(0)}</span>
+                </p>
+              </div>
             </div>
             <div className="space-y-2">
-              <Label className="font-semibold text-gray-700">Ngày sản xuất *</Label>
+              <Label className="font-bold text-gray-700">Ngày sản xuất *</Label>
               <Input
                 type="date"
                 value={batchForm.productionDate}
@@ -270,13 +351,13 @@ export default function Production() {
                 className="focus-visible:ring-orange-500 font-medium"
               />
             </div>
-            <div className="p-3 bg-orange-50 text-orange-800 rounded-lg text-xs leading-relaxed border border-orange-100 font-medium">
-              Lô sản xuất sẽ được tạo với trạng thái ban đầu là <strong>ĐANG NẤU</strong>. Hãy nhớ cập nhật trạng thái khi hoàn thành để chuyển sang Kho xác nhận.
+            <div className="p-3 bg-orange-50 text-orange-800 rounded-lg text-xs leading-relaxed border border-orange-100 font-medium italic">
+              Lô sản xuất sẽ được tạo với trạng thái ban đầu là <strong>ĐANG NẤU</strong>. Hệ thống tự động tính toán tổng sản phẩm dựa trên số lô đã nhập.
             </div>
           </div>
-          <Button onClick={handleCreateBatch} disabled={isSubmitting} className="w-full bg-orange-500 hover:bg-orange-600 py-6 text-base font-bold">
-            {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckSquare className="mr-2 h-5 w-5" />}
-            Bắt đầu nấu ngay
+          <Button onClick={handleCreateBatch} disabled={isSubmitting} className="w-full bg-orange-500 hover:bg-orange-600 py-6 text-base font-bold shadow-lg">
+            {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ChefHat className="mr-2 h-5 w-5" />}
+            Bắt đầu sản xuất ngay
           </Button>
         </DialogContent>
       </Dialog>

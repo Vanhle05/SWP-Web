@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getProducts, getProductionPlans, createProductionPlan } from '../../data/api';
+import { getProducts, getProductionPlans, createProductionPlan, getProductionPlanDetails } from '../../data/api';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../../components/ui/card';
+import { Badge } from '../../components/ui/badge';
+
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Calendar, Plus, Trash2, Loader2, ListChecks } from 'lucide-react';
+import { Calendar, Plus, Trash2, Loader2, ListChecks, Package } from 'lucide-react';
+
 import { toast } from 'sonner';
 
 export default function ProductionPlanning() {
@@ -31,7 +34,19 @@ export default function ProductionPlanning() {
         getProductionPlans().catch(() => [])
       ]);
       setProducts((prodData || []).filter(p => p.product_type === 'FINISHED_PRODUCT'));
-      setPlans(planData || []);
+
+      // Fetch details for each plan if not already included
+      const plansWithDetails = await Promise.all((planData || []).map(async (plan) => {
+        if (plan.details && plan.details.length > 0) return plan;
+        try {
+          const details = await getProductionPlanDetails(plan.planId);
+          return { ...plan, details };
+        } catch (err) {
+          return plan;
+        }
+      }));
+
+      setPlans(plansWithDetails.sort((a, b) => b.planId - a.planId));
     } catch (e) {
       toast.error('Lỗi tải dữ liệu');
     } finally {
@@ -85,7 +100,7 @@ export default function ProductionPlanning() {
         planDate: new Date().toISOString().split('T')[0],
         startDate: formData.startDate,
         endDate: formData.endDate,
-        status: 'OPEN',
+        status: 'PROCESSING',
         note: formData.note,
         details: formData.details.map(d => ({
           productId: Number(d.productId),
@@ -95,7 +110,7 @@ export default function ProductionPlanning() {
       };
 
       await createProductionPlan(payload);
-      
+
       toast.success('Tạo kế hoạch sản xuất thành công!');
       setIsOpen(false);
       setFormData({ startDate: '', endDate: '', note: '', details: [] });
@@ -107,6 +122,8 @@ export default function ProductionPlanning() {
     }
   };
 
+  const [expandedPlan, setExpandedPlan] = useState(null);
+
   if (loading) {
     return <div className="p-6 flex items-center justify-center min-h-[200px]"><Loader2 className="animate-spin" /></div>;
   }
@@ -116,60 +133,60 @@ export default function ProductionPlanning() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Kế hoạch sản xuất</h1>
-          <p className="text-muted-foreground">Lập kế hoạch cho bếp trung tâm (Flow 2)</p>
+          <p className="text-muted-foreground italic font-medium">Lập kế hoạch và theo dõi tiến độ bếp trung tâm</p>
         </div>
-        
+
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button><Calendar className="mr-2 h-4 w-4" /> Tạo kế hoạch mới</Button>
+            <Button className="bg-orange-600 hover:bg-orange-700 shadow-md font-bold text-white"><Calendar className="mr-2 h-4 w-4" /> Tạo kế hoạch mới</Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
-            <DialogHeader><DialogTitle>Tạo Kế hoạch Sản xuất</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-xl font-bold text-orange-600">Tạo Kế hoạch Sản xuất</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Ngày bắt đầu</Label>
-                  <Input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                  <Label className="font-bold">Ngày bắt đầu</Label>
+                  <Input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="focus:ring-orange-500" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Ngày kết thúc</Label>
-                  <Input type="date" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                  <Label className="font-bold">Ngày kết thúc</Label>
+                  <Input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="focus:ring-orange-500" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Ghi chú</Label>
-                <Input placeholder="Ghi chú tổng quát..." value={formData.note} onChange={e => setFormData({...formData, note: e.target.value})} />
+                <Label className="font-bold">Ghi chú</Label>
+                <Input placeholder="Ghi chú tổng quát cho kế hoạch này..." value={formData.note} onChange={e => setFormData({ ...formData, note: e.target.value })} />
               </div>
 
               <div className="mt-4 space-y-4">
-                <h4 className="font-semibold flex items-center justify-between border-b pb-2">
+                <h4 className="font-bold text-gray-800 flex items-center justify-between border-b pb-2 uppercase text-xs tracking-wider">
                   Danh sách Sản phẩm Cần làm
-                  <Button variant="outline" size="sm" onClick={addDetailRow}><Plus className="h-4 w-4 mr-1" /> Thêm món</Button>
+                  <Button variant="outline" size="sm" onClick={addDetailRow} className="text-xs border-orange-200 text-orange-600 hover:bg-orange-50"><Plus className="h-3 w-3 mr-1" /> Thêm món</Button>
                 </h4>
-                
-                {formData.details.length === 0 && <p className="text-sm text-center text-muted-foreground">Chưa có sản phẩm nào được chọn.</p>}
-                
+
+                {formData.details.length === 0 && <p className="text-sm text-center text-muted-foreground py-4 border border-dashed rounded italic">Chưa có sản phẩm nào được chọn.</p>}
+
                 {formData.details.map((detail, index) => (
-                  <div key={index} className="flex gap-2 items-center bg-muted/30 p-2 rounded">
+                  <div key={index} className="flex gap-2 items-center bg-muted/20 p-2.5 rounded-lg border">
                     <Select value={detail.productId} onValueChange={v => updateDetail(index, 'productId', v)}>
-                      <SelectTrigger className="w-[200px]"><SelectValue placeholder="Chọn thành phẩm..." /></SelectTrigger>
+                      <SelectTrigger className="w-[200px] border-orange-100 font-medium"><SelectValue placeholder="Chọn thành phẩm..." /></SelectTrigger>
                       <SelectContent>
                         {products.map(p => (
                           <SelectItem key={p.product_id} value={String(p.product_id)}>{p.product_name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input type="number" min="1" placeholder="SL" className="w-24" value={detail.quantity} onChange={e => updateDetail(index, 'quantity', e.target.value)} />
-                    <Input placeholder="Ghi chú thêm..." className="flex-1" value={detail.note} onChange={e => updateDetail(index, 'note', e.target.value)} />
-                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeDetailRow(index)}><Trash2 className="h-4 w-4" /></Button>
+                    <Input type="number" min="1" placeholder="SL" className="w-24 font-bold" value={detail.quantity} onChange={e => updateDetail(index, 'quantity', e.target.value)} />
+                    <Input placeholder="Ghi chú món..." className="flex-1" value={detail.note} onChange={e => updateDetail(index, 'note', e.target.value)} />
+                    <Button variant="ghost" size="icon" className="text-destructive hover:bg-red-50" onClick={() => removeDetailRow(index)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t pt-4">
               <Button variant="outline" onClick={() => setIsOpen(false)}>Hủy</Button>
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Xác nhận tạo'}
+              <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-6">
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Xác nhận tạo kế hoạch'}
               </Button>
             </div>
           </DialogContent>
@@ -177,40 +194,80 @@ export default function ProductionPlanning() {
 
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Danh sách kế hoạch</CardTitle>
+      <Card className="shadow-sm border-none bg-gray-50/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold text-gray-700 flex items-center gap-2">
+            <ListChecks className="h-5 w-5 text-orange-500" />
+            Lịch sử kế hoạch sản xuất
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {plans.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Chưa có kế hoạch nào.</p>
+            <div className="text-center py-12 bg-white rounded-xl border-2 border-dashed">
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
+              <p className="text-muted-foreground font-medium">Chưa có kế hoạch sản xuất nào.</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {plans.map((plan, i) => (
-                <div key={i} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                      <ListChecks className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-lg">Kế hoạch #{plan.planId}</h4>
-                      <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                        <span>Lập ngày: {new Date(plan.planDate).toLocaleDateString()}</span>
-                        <span>(Từ {plan.startDate} đến {plan.endDate})</span>
+                <div key={i} className="bg-white border rounded-xl overflow-hidden shadow-sm hover:border-orange-200 transition-all">
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-orange-50/5"
+                    onClick={() => setExpandedPlan(expandedPlan === plan.planId ? null : plan.planId)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${plan.status === 'DONE' ? 'bg-green-50' : 'bg-orange-50'}`}>
+                        <ListChecks className={`h-6 w-6 ${plan.status === 'DONE' ? 'text-green-600' : 'text-orange-600'}`} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-lg text-gray-800">Kế hoạch #{plan.planId}</h4>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-0.5 font-medium italic">
+                          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Ngày: {new Date(plan.planDate).toLocaleDateString('vi-VN')}</span>
+                          <span>Chu kỳ: {plan.startDate} &raquo; {plan.endDate}</span>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <Badge className={`${plan.status === 'DONE' ? 'bg-green-100 text-green-800' :
+                          plan.status === 'PROCESSING' ? 'bg-blue-100 text-blue-800' :
+                            'bg-orange-100 text-orange-800'
+                          } uppercase tracking-tighter text-[10px] font-black px-3`}>
+                          {plan.status || 'PROCESSING'}
+                        </Badge>
+                        <p className="text-[10px] font-bold mt-1.5 uppercase text-muted-foreground tracking-widest">{plan.details?.length || 0} Sản phẩm</p>
+                      </div>
+                      <Plus className={`h-5 w-5 text-muted-foreground transition-transform ${expandedPlan === plan.planId ? 'rotate-45' : ''}`} />
+                    </div>
                   </div>
-                  <div className="text-right space-y-1">
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                      plan.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                      plan.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' :
-                      plan.status === 'IN_PROGRESS' ? 'bg-orange-100 text-orange-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {plan.status || 'OPEN'}
-                    </span>
-                    <p className="text-sm font-medium mt-2">{plan.details?.length || 0} mục tiêu</p>
-                  </div>
+
+                  {expandedPlan === plan.planId && (
+                    <div className="px-4 pb-4 bg-gray-50/30 border-t animate-in slide-in-from-top-2 duration-200">
+                      <div className="pt-4 space-y-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 border-l-4 border-orange-500 pl-2">Chi tiết sản phẩm</p>
+                        <div className="grid gap-2">
+                          {plan.details?.map((detail, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-gray-700 text-sm">{detail.productName}</span>
+                                <span className="text-[11px] text-muted-foreground font-medium italic">{detail.note || 'Không có ghi chú thêm'}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-xs font-medium text-gray-500">Mục tiêu:</span>
+                                <span className="font-black text-orange-600 text-base">{detail.quantity}</span>
+                                <span className="text-xs font-bold text-gray-400 uppercase">{detail.unit || 'SP'}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {plan.note && (
+                          <div className="mt-3 p-3 bg-white rounded-lg border border-dashed text-xs text-muted-foreground italic">
+                            <strong>Ghi chú kế hoạch:</strong> {plan.note}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -220,3 +277,4 @@ export default function ProductionPlanning() {
     </div>
   );
 }
+
